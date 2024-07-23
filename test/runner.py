@@ -71,3 +71,4 @@ if (len(failing_tests) > 0):
   for test in failing_tests:
     print(test)
   print("Please look into build/test/test.out for details")
+  exit(1)
