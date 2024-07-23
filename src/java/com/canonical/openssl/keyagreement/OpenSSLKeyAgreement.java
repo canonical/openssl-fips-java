@@ -1,6 +1,7 @@
 package com.canonical.openssl.keyagreement;
 
 import com.canonical.openssl.util.NativeMemoryCleaner;
+import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
 import java.security.Key;
 import java.security.SecureRandom;
@@ -11,7 +12,7 @@ import java.util.Base64;
 
 abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
     static {
-        System.loadLibrary("jssl");
+        NativeLibraryLoader.load();
     }
 
     public static int AGREEMENT_DH = 0;

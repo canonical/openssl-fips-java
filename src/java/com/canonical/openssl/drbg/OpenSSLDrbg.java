@@ -1,6 +1,7 @@
 package com.canonical.openssl.drbg;
 
 import com.canonical.openssl.util.NativeMemoryCleaner;
+import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
 import java.security.SecureRandomSpi;
 import java.security.SecureRandomParameters;
@@ -11,7 +12,7 @@ public class OpenSSLDrbg extends SecureRandomSpi {
 
     public static int DEFAULT_STRENGTH = 128;
     static {
-        System.loadLibrary("jssl");
+        NativeLibraryLoader.load();
     }
 
     long drbgContext;

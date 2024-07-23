@@ -1,6 +1,7 @@
 package com.canonical.openssl.cipher;
 
 import com.canonical.openssl.util.NativeMemoryCleaner;
+import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
 import javax.crypto.CipherSpi;
 import javax.crypto.Cipher;
@@ -16,7 +17,7 @@ import javax.crypto.BadPaddingException;
 abstract public class OpenSSLCipher extends CipherSpi {
 
     static {
-        System.loadLibrary("jssl");
+        NativeLibraryLoader.load();
     }
 
     private static int UNDECIDED = -1;

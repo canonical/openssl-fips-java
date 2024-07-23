@@ -1,6 +1,7 @@
 package com.canonical.openssl.md;
 
 import com.canonical.openssl.util.NativeMemoryCleaner;
+import com.canonical.openssl.util.NativeLibraryLoader;
 
 import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
@@ -13,7 +14,7 @@ import java.util.Set;
 public abstract class OpenSSLMD extends MessageDigestSpi {
 
     static {
-        System.loadLibrary("jssl");
+        NativeLibraryLoader.load(); 
     }
 
     private static class MDState implements Runnable {

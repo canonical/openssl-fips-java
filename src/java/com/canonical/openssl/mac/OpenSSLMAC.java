@@ -1,6 +1,7 @@
 package com.canonical.openssl.mac;
 
 import com.canonical.openssl.util.NativeMemoryCleaner;
+import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
 import java.security.Key;
@@ -12,7 +13,7 @@ import javax.xml.crypto.dsig.spec.HMACParameterSpec;
 public abstract class OpenSSLMAC extends MacSpi {
 
     static {
-        System.loadLibrary("jssl");
+        NativeLibraryLoader.load();
     }
 
 

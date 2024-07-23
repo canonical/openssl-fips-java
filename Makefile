@@ -46,6 +46,7 @@ $(BUILD)/bin:
 
 $(BUILD)/classes:
 	@mkdir -p $@
+	@mkdir -p $@/resources/native
 
 $(BUILD)/test/bin:
 	@mkdir -p $@
@@ -61,7 +62,6 @@ $(BUILD)/bin/%.o: $(NATDIR)/%.c
 
 $(BUILD)/test/bin/%.o: $(TEST_JAVA_DIR)/native/%.c
 	@cc $(CCFLAGS) -o $@ $<
-
 
 $(SOLIB): $(OBJS)
 	@cc ${LDFLAGS} -o $@ $^ -L/usr/local/lib64 -lcrypto -lssl
@@ -79,6 +79,7 @@ java-build: $(BUILD)/classes $(JAVA_FILES)
 	@${JAVA_HOME}/bin/javac -d $^
 
 build: $(BUILD)/bin $(SOLIB) gen-code java-build
+	@cp ${SOLIB} $(BUILD)/classes/resources/native
 
 build-test: $(TEST_JAVA_SRCS) $(BUILD)/test/bin $(TESTLIB) $(TEST_C_OBJS)
 	@${JAVA_HOME}/bin/javac -cp build/classes -d build/test/classes $(TEST_JAVA_SRCS)

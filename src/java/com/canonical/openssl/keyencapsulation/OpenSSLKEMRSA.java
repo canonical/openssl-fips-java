@@ -1,6 +1,7 @@
 package com.canonical.openssl.keyencapsulation;
 
 import com.canonical.openssl.util.NativeMemoryCleaner;
+import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
 import javax.crypto.DecapsulateException;
 import javax.crypto.KEM;
@@ -22,7 +23,7 @@ import javax.crypto.spec.SecretKeySpec;
 final public class OpenSSLKEMRSA implements KEMSpi {
 
     static {
-        System.loadLibrary("jssl");
+        NativeLibraryLoader.load();
     }
 
     @Override

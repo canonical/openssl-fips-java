@@ -1,5 +1,6 @@
 package com.canonical.openssl.kdf;
 
+import com.canonical.openssl.util.NativeLibraryLoader;
 import java.security.spec.KeySpec;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -27,7 +28,7 @@ import javax.crypto.SecretKeyFactorySpi;
 public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
 
     static {
-        System.loadLibrary("jssl");
+        NativeLibraryLoader.load();
     }
 
     public class PBKDF2SecretKey implements PBEKey {

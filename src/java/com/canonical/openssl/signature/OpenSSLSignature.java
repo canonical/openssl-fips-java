@@ -2,6 +2,7 @@ package com.canonical.openssl.signature;
 
 import com.canonical.openssl.key.*;
 import com.canonical.openssl.util.NativeMemoryCleaner;
+import com.canonical.openssl.util.NativeLibraryLoader;
 
 import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
@@ -17,7 +18,7 @@ import java.security.SignatureSpi;
 public abstract class OpenSSLSignature extends SignatureSpi {
 
     static {
-        System.loadLibrary("jssl");
+        NativeLibraryLoader.load();    
     }
 
     private static class SignatureState implements Runnable {
