@@ -31,35 +31,89 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.10.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-runner</artifactId>
+            <version>1.10.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <version>5.10.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                    <release>21</release>
+                </configuration>
+            </plugin>
             <!-- Jar Plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.2.0</version>
-                <configuration>
-			<classesDirectory>${project.basedir}/build/classes</classesDirectory>
-                </configuration>
+                <version>3.4.2</version>
             </plugin>
             <plugin>
+                <!-- Plugin to help run make commands -->
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>1.6.0</version>
                 <executions>
                     <execution>
-                        <id>compile-c</id>
-                        <phase>compile</phase>
+                        <id>generate-sources</id>
+                        <phase>generate-sources</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
                         <configuration>
                             <executable>make</executable>
                             <arguments>
-				<argument>clean</argument>
-                                <argument>build</argument>
+				<argument>gen-code</argument>
                             </arguments>
                             <workingDirectory>${project.basedir}</workingDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-resources</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>make</executable>
+                            <arguments>
+                                <argument>solib</argument>
+                            </arguments>
+                            <workingDirectory>${project.basedir}</workingDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate-test-resources</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>make</executable>
+                            <arguments>
+                                <argument>test-solib</argument>
+                            </arguments>
                         </configuration>
                     </execution>
                     <execution>
@@ -76,23 +130,53 @@
                             <workingDirectory>${project.basedir}</workingDirectory>
                         </configuration>
                     </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
                     <execution>
-			<id>test</id>
-                        <phase>test</phase>
+                        <id>copy-files</id>
+                        <phase>process-resources</phase>
                         <goals>
-                            <goal>exec</goal>
+                            <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <executable>make</executable>
-                            <arguments>
-                                <argument>clean</argument>
-				<argument>test</argument>
-                            </arguments>
-                            <workingDirectory>${project.basedir}</workingDirectory>
+                            <outputDirectory>${project.build.directory}/classes/resources/native</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/build/bin</directory>
+                                    <includes>
+                                        <include>libjssl.so</include>
+                                    </includes>
+                                </resource>
+                            </resources>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <!-- Plugin to help run JUNIT tests -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.1.0</version>
+                <configuration>
+                    <environmentVariables>
+                        <LD_LIBRARY_PATH>
+                            ${env.LD_LIBRARY_PATH}:${project.basedir}/build/test/bin:${project.basedir}/build/bin
+                        </LD_LIBRARY_PATH>
+                    </environmentVariables>
+
+                    <includes>
+                        <include>**/*Test.java</include>
+                    </includes>
+                    <excludes>
+                       <exclude>**/*SecureRandomTest.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>           
         </plugins>
     </build>
 </project>
