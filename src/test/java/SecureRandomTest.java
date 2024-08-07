@@ -24,83 +24,69 @@ import java.security.SecureRandom;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
+
+import org.junit.Test;
+import org.junit.BeforeClass;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
+
 /*
  * TODO: params have an impact on the random number generation, openssl crashes at times.
  * It is essential to understand this impact in totality to maintain a good DRBG API
  */ 
-public class SecureRandomApiTest {
-    private static boolean failed = false;
-    private static void  _IN(String s)  { System.out.print(s + ": "); }
-    private static void _OUT(String s)  { System.out.println(s);  failed = s.equals("Failed"); }
-
-
-    private static boolean checkRandomness(byte [] array1, byte [] array2) {
-	// TODO: Implement something like Pearson correlation coefficient
-        return true;
+public class SecureRandomTest {
+    private void testArrayInequality(byte[] a, byte[] b) {
+        assertFalse("Consecutive calls generated equal arrays", Arrays.equals(a, b));
     }
 
-    private static void testDRBGCreation() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation");
+    @Test
+    public void testDRBGCreation() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
         SecureRandom hash = SecureRandom.getInstance("HMACSHA256", "OpenSSLFIPSProvider");
 
-        if (ctr.generateSeed(8).length == 8 &&
-            hmac.generateSeed(8).length == 8 &&
-            hash.generateSeed(8).length == 8) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        assertEquals("Invalid seed length [CTR]", ctr.generateSeed(8).length, 8);
+        assertEquals("Invalid seed length [HMAC]", hmac.generateSeed(8).length, 8);
+        assertEquals("Invalid seed length [HASH]", hash.generateSeed(8).length, 8);
     }
 
-    private static void testDRBGCreationWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with parameters");
+    @Test
+    public void testDRBGCreationWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(144, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes()); 
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", params, "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512", params, "OpenSSLFIPSProvider");
         SecureRandom hash = SecureRandom.getInstance("HMACSHA256", params, "OpenSSLFIPSProvider");
-        if (ctr.generateSeed(8).length == 8 &&
-            hmac.generateSeed(8).length == 8 &&
-            hash.generateSeed(8).length == 8) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+
+        assertEquals("Invalid seed length [CTR]", ctr.generateSeed(8).length, 8);
+        assertEquals("Invalid seed length [HMAC]", hmac.generateSeed(8).length, 8);
+        assertEquals("Invalid seed length [HASH]", hash.generateSeed(8).length, 8);
     }
 
-    private static void testDRBGCreationGenerateSeed() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation and seed generation");
+    @Test
+    public void testDRBGCreationGenerateSeed() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
         SecureRandom hash = SecureRandom.getInstance("HMACSHA256", "OpenSSLFIPSProvider");
-        if (checkRandomness(ctr.generateSeed(8), ctr.generateSeed(8)) &&
-            checkRandomness(hmac.generateSeed(16), hmac.generateSeed(16)) && 
-            checkRandomness(hash.generateSeed(32), hash.generateSeed(32))) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+
+        testArrayInequality(ctr.generateSeed(8), ctr.generateSeed(8));
+        testArrayInequality(hmac.generateSeed(16), hmac.generateSeed(16));
+        testArrayInequality(hash.generateSeed(32), hash.generateSeed(32));
     }
 
-    private static void testDRBGCreationWithParamsGenerateSeed() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with parameters and seed generation");
+    @Test
+    public void testDRBGCreationWithParamsGenerateSeed() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(144, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes());
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
         SecureRandom hash = SecureRandom.getInstance("HMACSHA256", "OpenSSLFIPSProvider");
-        if (checkRandomness(ctr.generateSeed(8), ctr.generateSeed(8)) &&
-            checkRandomness(hmac.generateSeed(16), hmac.generateSeed(16)) &&
-            checkRandomness(hash.generateSeed(32), hash.generateSeed(32))) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+
+        testArrayInequality(ctr.generateSeed(8), ctr.generateSeed(8));
+        testArrayInequality(hmac.generateSeed(16), hmac.generateSeed(16));
+        testArrayInequality(hash.generateSeed(32), hash.generateSeed(32));
     }
 
-    private static void testDRBGCreationNextBytes() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation and next bytes");
-        
+    @Test
+    public void testDRBGCreationNextBytes() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
         SecureRandom hash = SecureRandom.getInstance("HMACSHA256", "OpenSSLFIPSProvider");
@@ -120,17 +106,13 @@ public class SecureRandomApiTest {
         hash.nextBytes(hash1);
         hash.nextBytes(hash2);
  
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationWithParamsNextBytes() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with params and next bytes");
+    @Test
+    public void testDRBGCreationWithParamsNextBytes() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(256, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes());
 
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", params, "OpenSSLFIPSProvider");
@@ -153,17 +135,13 @@ public class SecureRandomApiTest {
         hash.nextBytes(hash1);
         hash.nextBytes(hash2);
     
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed"); 
-        } else {
-            _OUT("Failed"); 
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationNextBytesWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
-       _IN("Test DRBG creation and next bytes with params");
+    @Test
+    public void testDRBGCreationNextBytesWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters nbParams = DrbgParameters.nextBytes(256, false, "123456".getBytes());
 
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
@@ -186,17 +164,13 @@ public class SecureRandomApiTest {
         hash.nextBytes(hash1, nbParams);
         hash.nextBytes(hash2, nbParams);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationWithParamsNextBytesWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with params, next bytes with params");
+    /* disabled - needs a "double-free" investigation" */
+    private void testDRBGCreationWithParamsNextBytesWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(128, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes());
         SecureRandomParameters nbParams = DrbgParameters.nextBytes(128, true, "ADDITIONALINPUT".getBytes());
 
@@ -219,17 +193,13 @@ public class SecureRandomApiTest {
         hash.nextBytes(hash1, nbParams);
         hash.nextBytes(hash2, nbParams);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationReseed() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation and reseed");
+    @Test
+    public void testDRBGCreationReseed() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
         SecureRandom hash = SecureRandom.getInstance("HMACSHA256", "OpenSSLFIPSProvider");
@@ -252,17 +222,13 @@ public class SecureRandomApiTest {
         hash.reseed();
         hash.nextBytes(hash2);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationWithParamsReseed() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with params and reseed");
+    @Test
+    public void testDRBGCreationWithParamsReseed() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(128, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes());
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", params, "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512", params, "OpenSSLFIPSProvider");
@@ -286,17 +252,13 @@ public class SecureRandomApiTest {
         hash.reseed();
         hash.nextBytes(hash2);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationReseedWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation and reseed with params");
+    @Test
+    public void testDRBGCreationReseedWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
         SecureRandom hash = SecureRandom.getInstance("HMACSHA256", "OpenSSLFIPSProvider");
@@ -320,17 +282,13 @@ public class SecureRandomApiTest {
         hash.reseed(rs);
         hash.nextBytes(hash2);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationWithParamsReseedWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with params, reseed with params");
+    @Test
+    public void testDRBGCreationWithParamsReseedWithParams() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(128, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes());
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", params, "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512", params, "OpenSSLFIPSProvider");
@@ -355,17 +313,13 @@ public class SecureRandomApiTest {
         hash.reseed(rs);
         hash.nextBytes(hash2);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationSetSeedBytes() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with params and reseed with bytes");
+    @Test
+    public void testDRBGCreationSetSeedBytes() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(128, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes());
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
@@ -389,17 +343,13 @@ public class SecureRandomApiTest {
         hash.setSeed("NEWBYTES".getBytes());
         hash.nextBytes(hash2);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationWithParamsSetSeedBytes() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with params and reseed with bytes");
+    @Test
+    public void testDRBGCreationWithParamsSetSeedBytes() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(128, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes());
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", params, "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512", params, "OpenSSLFIPSProvider");
@@ -423,17 +373,13 @@ public class SecureRandomApiTest {
         hash.setSeed("NEWBYTES".getBytes());
         hash.nextBytes(hash2);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     } 
 
-    private static void testDRBGCreationSetSeedLong() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with params and reseed with long");
+    @Test
+    public void testDRBGCreationSetSeedLong() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
         SecureRandom hash = SecureRandom.getInstance("HMACSHA256", "OpenSSLFIPSProvider");
@@ -456,17 +402,13 @@ public class SecureRandomApiTest {
         hash.setSeed(Long.MAX_VALUE);
         hash.nextBytes(hash2);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    private static void testDRBGCreationWithParamsSetSeedLong() throws NoSuchAlgorithmException, NoSuchProviderException {
-        _IN("Test DRBG creation with params and reseed with long");
+    @Test
+    public void testDRBGCreationWithParamsSetSeedLong() throws NoSuchAlgorithmException, NoSuchProviderException {
         SecureRandomParameters params = DrbgParameters.instantiation(128, Capability.PR_AND_RESEED, "FIPSPROTOTYPE".getBytes());
         SecureRandom ctr = SecureRandom.getInstance("AES256CTR", params, "OpenSSLFIPSProvider");
         SecureRandom hmac = SecureRandom.getInstance("HashSHA512", params, "OpenSSLFIPSProvider");
@@ -490,33 +432,13 @@ public class SecureRandomApiTest {
         hash.setSeed(Long.MAX_VALUE);
         hash.nextBytes(hash2);
 
-        if(checkRandomness(ctr1, ctr2)
-           && checkRandomness(hmac1, hmac2)
-           && checkRandomness(hash1, hash2)) {
-            _OUT("Passed");
-        } else {
-            _OUT("Failed");
-        }
+        testArrayInequality(ctr1, ctr2);
+        testArrayInequality(hmac1, hmac2);
+        testArrayInequality(hash1, hash2);
     }
 
-    public static void main(String []args) throws NoSuchAlgorithmException, NoSuchProviderException {
+    @BeforeClass
+    public static void addProvider() {
         Security.addProvider(new OpenSSLFIPSProvider());
-        testDRBGCreation();	
-        testDRBGCreationWithParams();
-        testDRBGCreationGenerateSeed();
-        testDRBGCreationWithParamsGenerateSeed();
-        testDRBGCreationNextBytes();
-        testDRBGCreationNextBytesWithParams();
-        testDRBGCreationWithParamsNextBytes();
-        // testDRBGCreationWithParamsNextBytesWithParams(); TODO - fails with a double free()
-        testDRBGCreationReseed();
-        testDRBGCreationWithParamsReseed();
-        testDRBGCreationReseedWithParams();
-        testDRBGCreationWithParamsReseedWithParams();
-        testDRBGCreationSetSeedBytes();
-        testDRBGCreationWithParamsSetSeedBytes();
-        testDRBGCreationSetSeedLong();
-        testDRBGCreationWithParamsSetSeedLong();
-	System.exit(failed ? 1 : 0);
     }
 }

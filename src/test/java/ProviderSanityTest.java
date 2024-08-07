@@ -42,69 +42,47 @@ import com.canonical.openssl.signature.*;
 import com.canonical.openssl.kdf.*;
 import com.canonical.openssl.cipher.*;
 
-public class ProviderSanityTest {
-    public static void main(String[] args) {
-        Security.addProvider(new OpenSSLFIPSProvider());
-        testDRBG();
-        testKeyAgreement();
-        testKeyEncapsulation();
-        testMAC();
-        testMessageDigests();
-        testSignatures();
-        testKDF();
-        testCipher();
-    }
+import org.junit.Test;
+import org.junit.BeforeClass;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-    // This may not make sense. Such paranoia for the JCE/JCA is bad.
-    private static boolean check(Class<?> klass, Object algo, Class<?> expectedSpiClass, String privateFieldName) {
-        try {
-            Field f = algo.getClass().getDeclaredField(privateFieldName);
-            f.setAccessible(true);
-            return expectedSpiClass.isInstance(f.get(algo));
-        } catch (NoSuchFieldException | IllegalAccessException nfe) {
-            // Don't fail because implementaion details changed.
-            System.out.print("[WARNING] " + algo);
-            return true;
-        }
+
+public class ProviderSanityTest {
+    @BeforeClass
+    public static void addProvider() {
+        Security.addProvider(new OpenSSLFIPSProvider());
     }
 
     private static void test(Class<?> klass, String algo, Class<?> expectedSpiClass, String privateFieldName) {
-        System.out.print(" - " + algo + ":");
-        try { 
+        assertDoesNotThrow(() -> { 
             Method getInstanceMethod = klass.getDeclaredMethod("getInstance", String.class, String.class);
             Object algoInstance = getInstanceMethod.invoke(null, algo, "OpenSSLFIPSProvider");
-            if (algoInstance != null && check(klass, algoInstance, expectedSpiClass, privateFieldName)) {
-                System.out.println("ok");
-            }
-        } catch (InvocationTargetException ite) {
-            if (ite.getCause() instanceof NoSuchAlgorithmException) {
-                System.out.println("fail");
-            }
-        } catch (NoSuchMethodException | IllegalAccessException e) {
-            System.out.println("error");
-        }
+            assertNotNull("Failed to create instances for " + algo, algoInstance);
+        });
     }
 
-    private static void testDRBG() {
-        System.out.println("Testing DRBG algorithms: ");
+    @Test
+    public void testDRBG() {
         test(SecureRandom.class, "AES256CTR", DrbgAES256CTR.class, "secureRandomSpi");
         test(SecureRandom.class, "HashSHA512", DrbgHashSHA512.class, "secureRandomSpi");
         test(SecureRandom.class, "HMACSHA256", DrbgHMACSHA256.class, "secureRandomSpi");
     }
 
-    private static void testKeyAgreement() {
-        System.out.println("Testing Key Agreements: ");
+    @Test
+    public void testKeyAgreement() {
         test(KeyAgreement.class, "DH", DHKeyAgreement.class, "spi");
         test(KeyAgreement.class, "ECDH", ECDHKeyAgreement.class, "spi");
     }
 
-    private static void testKeyEncapsulation() {
-        System.out.println("Testing Key Encapsulation:");
+    @Test
+    public void testKeyEncapsulation() {
         test(KEM.class, "RSA", OpenSSLKEMRSA.class, "spi");
     }
 
-    private static void testMAC() {
-        System.out.println("Test MAC algorithms:");
+    @Test
+    public void testMAC() {
         test(Mac.class, "CMACwithAes256CBC", CMACwithAes256CBC.class, "spi");
         test(Mac.class, "GMACWithAes128GCM", GMACWithAes128GCM.class, "spi");
         test(Mac.class, "HMACwithSHA1", HMACwithSHA1.class, "spi");
@@ -113,8 +91,8 @@ public class ProviderSanityTest {
         test(Mac.class, "KMAC256", KMAC256.class, "spi");
     }
 
-    private static void testMessageDigests() {
-        System.out.println("Testing Message Digest algorithms:");
+    @Test
+    public void testMessageDigests() {
         test(MessageDigest.class, "MDKeccakKemak128", MDKeccakKemak128.class, "digestSpi");
         test(MessageDigest.class, "MDKeccakKemak256", MDKeccakKemak256.class, "digestSpi");
         test(MessageDigest.class, "MDSHA1", MDSHA1.class, "digestSpi");
@@ -128,20 +106,20 @@ public class ProviderSanityTest {
         test(MessageDigest.class, "MDSHA3_256", MDSHA3_256.class, "digestSpi");
     }
 
-    private static void testSignatures() {
-        System.out.println("Testing Signature algorithms:");
+    @Test
+    public void testSignatures() {
         test(Signature.class, "RSA", SignatureRSA.class, "sigSpi");
         test(Signature.class, "ED448", SignatureED448.class, "sigSpi");
         test(Signature.class, "ED25519", SignatureED25519.class, "sigSpi");
     }
 
-    private static void testKDF() {
-        System.out.println("Testing Key Derivation Functions:");
+    @Test
+    public void testKDF() {
         test(SecretKeyFactory.class, "PBKDF2", PBKDF2withSHA512.class, "spi");
     }
 
-    private static void testCipher() {
-        System.out.println("Testing Ciphers:");
+    @Test
+    public void testCipher() {
         test(Cipher.class, "AES128/ECB/NONE", AES128withECBpaddingNONE.class, "spi");
         test(Cipher.class, "AES128/ECB/PKCS7", AES128withECBpaddingPKCS7.class, "spi");
         test(Cipher.class, "AES128/ECB/PKCS5", AES128withECBpaddingPKCS5.class, "spi");

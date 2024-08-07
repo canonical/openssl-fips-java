@@ -25,9 +25,18 @@ import javax.crypto.SecretKey;
 import javax.crypto.KeyAgreement;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
-public class KeyAgreementApiTest {
+import org.junit.Test;
+import org.junit.BeforeClass;
+import static org.junit.Assert.assertArrayEquals;
 
-    private static boolean runTest(KeyPairGenerator kpg, String algo) throws Exception {
+public class KeyAgreementTest {
+
+    @BeforeClass
+    public static void addProvider() {
+        Security.addProvider(new OpenSSLFIPSProvider());
+    }
+
+    private void runTest(KeyPairGenerator kpg, String algo) throws Exception {
         KeyPair aliceKp = kpg.generateKeyPair();
         KeyPair bobKp = kpg.generateKeyPair();
         KeyAgreement aliceAgreement = KeyAgreement.getInstance(algo, "OpenSSLFIPSProvider");
@@ -38,32 +47,18 @@ public class KeyAgreementApiTest {
         bobAgreement.doPhase(aliceKp.getPublic(), true);
         byte[] aliceSecret = aliceAgreement.generateSecret();
         byte[] bobSecret = bobAgreement.generateSecret();
-        return Arrays.equals(aliceSecret, bobSecret);
-   }
+        assertArrayEquals("Key Agreement test for " + algo +  " failed", aliceSecret, bobSecret);
+    }
 
-    public static void testDH() throws Exception {
-        System.out.print("Test Key Agreement [Diffie-Hellman]: ");
+    @Test
+    public void testDH() throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("DH");
-        if (runTest(kpg, "DH")) {
-            System.out.println("PASSED");
-        } else {
-            System.out.println("FAILED");
-        }
+        runTest(kpg, "DH");
     }
 
-    public static void testECDH() throws Exception {
-        System.out.print("Test Key Agreement [Elliptic-Curve]: ");
+    @Test
+    public void testECDH() throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
-        if (runTest(kpg, "ECDH")) {
-            System.out.println("PASSED");
-        } else {
-            System.out.println("FAILED");
-        }
-    }
-
-    public static void main(String[] args) throws Exception {
-        Security.addProvider(new OpenSSLFIPSProvider());
-        testDH();
-        testECDH();
+        runTest(kpg, "ECDH");
     }
 }

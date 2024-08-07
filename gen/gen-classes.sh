@@ -22,7 +22,7 @@ do
   do
     pad=$line
     pad_c=$(echo $pad | tr "." _ | tr "-" _)
-    path=${PWD}/src/java/com/canonical/openssl/cipher/AES${ks}with${mode}padding${pad_c}.java
+    path=${PWD}/src/main/java/com/canonical/openssl/cipher/AES${ks}with${mode}padding${pad_c}.java
     cp ${PWD}/gen/template.java ${path}
     sed -i 's/__PADC__/'$pad_c'/g' ${path}
     sed -i 's/__KS__/'$ks'/g' ${path} 

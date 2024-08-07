@@ -24,10 +24,15 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
-public class SecretKeyFactoryApiTest {
+import org.junit.Test;
+import org.junit.BeforeClass;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertNotEquals;
 
-    private static void testPBKDF2() throws Exception {
-        System.out.print("Testing OpenSSL/PBKDF2: ");
+public class SecretKeyFactoryTest {
+
+    @Test
+    public void testPBKDF2() throws Exception {
         String password = "Zaq12wsXCde34rfV";
         String salt = "NaClCommonSaltRockSaltSeaSalt";
         int iterationCount = 120000;
@@ -39,15 +44,12 @@ public class SecretKeyFactoryApiTest {
         SecretKeyFactory pbkdf = SecretKeyFactory.getInstance("PBKDF2", "OpenSSLFIPSProvider");
         SecretKey sk1 = pbkdf.generateSecret(keySpec);
         SecretKey sk2 = pbkdf.translateKey(sk1);
-        if (sk1.getEncoded().length != 0 && Arrays.equals(sk1.getEncoded(), sk2.getEncoded())) {
-            System.out.println("PASSED");
-        } else {
-            System.out.println("FAILED");
-        }
+        assertNotEquals("SecretKey is of length 0", sk1.getEncoded().length, 0);
+        assertArrayEquals("Invalid secret key", sk1.getEncoded(), sk2.getEncoded());
     }
 
-    public static void main(String[] args) throws Exception {
+    @BeforeClass
+    public static void addProvider() throws Exception {
         Security.addProvider(new OpenSSLFIPSProvider());
-        testPBKDF2();
     }
 }

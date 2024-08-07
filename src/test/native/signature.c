@@ -108,8 +108,8 @@ void test_ed25519_sign_and_verify(OSSL_LIB_CTX *libctx) {
     printf("Testing ED25519 sign and verify: ");
 
     EVP_PKEY *public_key = NULL, *private_key = NULL;
-    FILE *priv_key_pem = fopen("test/keys/ed25519-priv.pem", "r");
-    FILE *pub_key_pem = fopen("test/keys/ed25519-pub.pem", "r");
+    FILE *priv_key_pem = fopen("src/test/keys/ed25519-priv.pem", "r");
+    FILE *pub_key_pem = fopen("src/test/keys/ed25519-pub.pem", "r");
 
     if (priv_key_pem == NULL || pub_key_pem == NULL) {
         printf("FAILED (can't read PEM files)\n");
@@ -130,8 +130,8 @@ void test_ed448_sign_and_verify(OSSL_LIB_CTX *libctx) {
     printf("Testing ED448 sign and verify: ");
 
     EVP_PKEY *public_key = NULL, *private_key = NULL;
-    FILE *priv_key_pem = fopen("test/keys/ed448-priv.pem", "r");
-    FILE *pub_key_pem = fopen("test/keys/ed448-pub.pem", "r");
+    FILE *priv_key_pem = fopen("src/test/keys/ed448-priv.pem", "r");
+    FILE *pub_key_pem = fopen("src/test/keys/ed448-pub.pem", "r");
     
     if (priv_key_pem == NULL || pub_key_pem == NULL) {
         printf("FAILED (can't read PEM files)\n");

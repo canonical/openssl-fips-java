@@ -23,7 +23,14 @@ import java.security.Security;
 import java.security.MessageDigest;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
-public class MDApiTest {
+import org.junit.Test;
+import org.junit.BeforeClass;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
+
+public class MDTest {
 
     private static byte[] input = """
        From that time on, the world was hers for the reading.
@@ -40,26 +47,22 @@ public class MDApiTest {
         return md.digest();
     };
 
-    private static void runTest(String name) throws Exception {
-        System.out.print("Testing " + name +  ": ");
-        MessageDigest md1 = MessageDigest.getInstance(name, "OpenSSLFIPSProvider");
-        MessageDigest md2 = MessageDigest.getInstance(name, "OpenSSLFIPSProvider");
-        MessageDigest md3 = MessageDigest.getInstance(name, "OpenSSLFIPSProvider");
-        byte[] output1 = mdCompute.apply(md1, input);
-        byte[] output2 = mdCompute.apply(md2, input);
-        byte[] output3 = mdCompute.apply(md3, input1);
-        if (Arrays.equals(output1, output2) && !Arrays.equals(output2, output3)) {
-            System.out.println("PASSED");
-        } else {
-            System.out.println("FAILED");
+    @Test
+    public void messageDigestTest() throws Exception {
+        for (String name : List.of("MDSHA1", "MDSHA224", "MDSHA3_384", "MDSHA3_512")) { 
+            MessageDigest md1 = MessageDigest.getInstance(name, "OpenSSLFIPSProvider");
+            MessageDigest md2 = MessageDigest.getInstance(name, "OpenSSLFIPSProvider");
+            MessageDigest md3 = MessageDigest.getInstance(name, "OpenSSLFIPSProvider");
+            byte[] output1 = mdCompute.apply(md1, input);
+            byte[] output2 = mdCompute.apply(md2, input);
+            byte[] output3 = mdCompute.apply(md3, input1);
+            assertArrayEquals("Test for Message Digest "  + name + " failed.", output1, output2);
+            assertFalse("Test for Message Digest " + name + " failed.", Arrays.equals(output2, output3));
         }
     }
 
-    public static void main(String[] args) throws Exception {
+    @BeforeClass
+    public static void addProvider() {
         Security.addProvider(new OpenSSLFIPSProvider());
-        List<String> tests = List.of("MDSHA1", "MDSHA224", "MDSHA3_384", "MDSHA3_512");
-        for (var test: tests) {
-            runTest(test);
-        }
     }
 }

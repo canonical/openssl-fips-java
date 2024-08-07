@@ -29,6 +29,13 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.SignatureException;
+import java.security.Security;
+import java.security.Signature;
+import com.canonical.openssl.provider.OpenSSLFIPSProvider;
+
+import org.junit.Test;
+import org.junit.BeforeClass;
+import static org.junit.Assert.assertTrue;
 
 public class SignatureTest {
     static {
@@ -46,48 +53,49 @@ public class SignatureTest {
          + "beardless, athletic youth). Apollo is known in Greek-influenced "
          + "Etruscan mythology as Apulu.";
 
-    private static void testRSA() throws Exception {
+    @Test
+    public void testRSA() throws Exception {
         RSAKeyPairGenerator gen = new RSAKeyPairGenerator();
         gen.generateKeyPair();
-        testSignature("RSA", TestSignatureRSA.class, gen.pubKey, gen.privKey);
+        testSignature("RSA", gen.pubKey, gen.privKey);
     }
 
-    private static void testED25519() throws Exception {
-        EdDSAPublicKey publicKey = new EdDSAPublicKey("test/keys/ed25519-pub.pem");
-        EdDSAPrivateKey privateKey = new EdDSAPrivateKey("test/keys/ed25519-priv.pem");
-        testSignature("ED25519", TestSignatureED25519.class, publicKey, privateKey);
+    @Test
+    public void testED25519() throws Exception {
+        EdDSAPublicKey publicKey = new EdDSAPublicKey("src/test/keys/ed25519-pub.pem");
+        EdDSAPrivateKey privateKey = new EdDSAPrivateKey("src/test/keys/ed25519-priv.pem");
+        testSignature("ED25519", publicKey, privateKey);
     }
 
-    private static void testED448() throws Exception {
-        EdDSAPublicKey publicKey = new EdDSAPublicKey("test/keys/ed448-pub.pem");
-        EdDSAPrivateKey privateKey = new EdDSAPrivateKey("test/keys/ed448-priv.pem");
-        testSignature("ED448", TestSignatureED448.class, publicKey, privateKey);
+    @Test
+    public void testED448() throws Exception {
+        EdDSAPublicKey publicKey = new EdDSAPublicKey("src/test/keys/ed448-pub.pem");
+        EdDSAPrivateKey privateKey = new EdDSAPrivateKey("src/test/keys/ed448-priv.pem");
+        testSignature("ED448", publicKey, privateKey);
     }
 
-    private static void testSignature(String algo, Class<? extends TestSignature> clazz, PublicKey publicKey, PrivateKey privateKey) throws Exception {
-        System.out.print("Testing " + algo + " Signatures: ");
-        TestSignature signer = (TestSignature) clazz.newInstance();
+    private static void testSignature(String algo,  PublicKey publicKey, PrivateKey privateKey) throws Exception {
+        Signature signer = Signature.getInstance(algo, "OpenSSLFIPSProvider");
         if (algo.equals("RSA")) {
-            signer.engineSetParameter("digest", "SHA-256"); // TODO: why does this work only with SHA-256? 
+            signer.setParameter("digest", "SHA-256"); // TODO: why does this work only with SHA-256? 
         }
-        signer.engineInitSign(privateKey);
+        signer.initSign(privateKey);
         byte[] bytes = message.getBytes();
-        signer.engineUpdate(bytes, 0, bytes.length);
-        byte[] sigBytes = signer.engineSign();
+        signer.update(bytes, 0, bytes.length);
+        byte[] sigBytes = signer.sign();
 
-        TestSignature verifier = (TestSignature) clazz.newInstance();
+        Signature verifier = Signature.getInstance(algo, "OpenSSLFIPSProvider");
         if (algo.equals("RSA")) {
-            signer.engineSetParameter("digest", "SHA-256");
+            verifier.setParameter("digest", "SHA-256");
         }
-        verifier.engineInitVerify(publicKey);
-        verifier.engineUpdate(bytes, 0, bytes.length);
-        System.out.println(verifier.engineVerify(sigBytes) ? "PASSED": "FAILED");
+        verifier.initVerify(publicKey);
+        verifier.update(bytes, 0, bytes.length);
+        assertTrue("SignatureTest for " + algo + " failed.", verifier.verify(sigBytes));
     }
 
-    public static void main(String[] args) throws Exception {
-        testRSA();
-        testED25519();
-        testED448();
+    @BeforeClass
+    public static void addProvider() throws Exception {
+        Security.addProvider(new OpenSSLFIPSProvider());
     }
 }
 
@@ -169,97 +177,4 @@ class RSAKeyPairGenerator {
     }
 
     private native void generateKeyPair0();
-}
-
-abstract class TestSignature extends OpenSSLSignature {
-
-    protected abstract String getSignatureName();
-
-    @Override
-    public Object engineGetParameter(String param) {
-        return super.engineGetParameter(param);
-    }
-
-    @Override
-    public void engineSetParameter(String param, Object value) {
-        super.engineSetParameter(param, value);
-    }
-
-    @Override
-    public void engineInitSign(PrivateKey key) throws InvalidKeyException {
-        super.engineInitSign(key);
-    }
-
-    @Override
-    public void engineInitSign(PrivateKey key, SecureRandom random) throws InvalidKeyException {
-        super.engineInitSign(key, random);
-    }
-
-    @Override
-    public void engineInitVerify(PublicKey key) throws InvalidKeyException {
-        super.engineInitVerify(key);
-    }
-
-    @Override
-    public AlgorithmParameters engineGetParameters() {
-        return super.engineGetParameters();
-    }
-
-    @Override
-    public void engineSetParameter(AlgorithmParameterSpec params) {
-        super.engineSetParameter(params);
-    }
-
-    @Override
-    public byte[] engineSign() {
-        return super.engineSign();
-    }
-
-    @Override
-    public int engineSign(byte[] outbuf, int offset, int len) {
-        return super.engineSign(outbuf, offset, len);
-    }
-
-    @Override
-    public void engineUpdate(byte b) throws SignatureException {
-        super.engineUpdate(b);
-    }
-
-    @Override
-    public void engineUpdate(byte[] b, int off, int len) throws SignatureException {
-        super.engineUpdate(b, off, len);
-    }
-
-    @Override
-    public void engineUpdate(ByteBuffer input) {
-        super.engineUpdate(input);
-    }
-
-    @Override
-    public boolean engineVerify(byte[] sigBytes) {
-        return super.engineVerify(sigBytes);
-    }
-
-    @Override
-    public boolean engineVerify(byte[] sigBytes, int offset, int length) {
-        return super.engineVerify(sigBytes, offset, length);
-    }
-}
-
-class TestSignatureED25519 extends TestSignature {
-    public String getSignatureName() {
-        return "ED25519";
-    }
-}
-
-class TestSignatureED448 extends TestSignature {
-    public String getSignatureName() {
-        return "ED448";
-    }
-}
-
-class TestSignatureRSA extends TestSignature {
-    public String getSignatureName() {
-        return "RSA";
-    }
 }

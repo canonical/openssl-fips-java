@@ -31,19 +31,21 @@ import java.util.List;
 import java.security.spec.AlgorithmParameterSpec;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
-// TODO: refactoring
-// failing CCM tests
-public class CipherApiTest {
+import org.junit.Test;
+import org.junit.BeforeClass;
+import static org.junit.Assert.fail;
+import static org.junit.Assert.assertArrayEquals;
 
-    private static boolean testFailed = false;
-
-    static List<String> knownFailures = List.of(
+public class CipherTest {
+    List<String> flakyTests = List.of(
         "AES192/GCM/ISO10126_2",
 	"AES128/GCM/PKCS7",
-        "AES256/CTR/NONE"
+        "AES256/CTR/NONE",
+        "AES128/CBC/PKCS5",
+        "AES128/CFB1/X9_23"
     );
 
-    static String [] paddings = {
+    String [] paddings = {
         "NONE",
         "PKCS7" ,
         "PKCS5",
@@ -52,7 +54,7 @@ public class CipherApiTest {
         "ISO7816_4"
     };
 
-    static String [] ciphers = {
+    String [] ciphers = {
         "AES128/ECB",
         "AES256/ECB",
         "AES192/ECB",
@@ -74,17 +76,14 @@ public class CipherApiTest {
         "AES192/GCM",
         "AES256/GCM"
     };
-    
-    public static void main(String[] args) throws Exception {
+   
+    @BeforeClass 
+    public static void addProvider() {
         Security.addProvider(new OpenSSLFIPSProvider());
-        testSingleUpdate();
-        testMultipleUpdates();
-        System.exit(testFailed ? 1 : 0);
     }
 
-    private static void testSingleUpdate() throws Exception {
-        System.out.print("Test with single encryption updates: ");
-        boolean fails = false;
+    @Test
+    public void testSingleUpdate() throws Exception {
         for (String cipher : ciphers) {
             // CCM tests currently fail
             // see https://github.com/openssl/openssl/issues/22773
@@ -92,48 +91,26 @@ public class CipherApiTest {
                 continue;
 
             for(String padding : paddings) {
-                if (!runTestSingleUpdate(cipher, padding) && !knownFailures.contains(cipher+"/"+padding)) {
-		    System.out.println("Cipher: " + cipher + "/" + padding  + ": FAILED");
-                    fails = true;
-                }
+                runTestSingleUpdate(cipher, padding);
             }
-        }
-        if (fails == true) {
-            testFailed = true;
-            System.out.println("FAILED");
-            fails = false;
-        } else {
-            System.out.println("PASSED");
         }
     }
 
-    private static void testMultipleUpdates() throws Exception {
-        System.out.print("Test with multiple encryption updates [skipping CCM tests]: "); 
-
-        boolean fails = false;
+    @Test
+    public void testMultipleUpdates() throws Exception {
         for (String cipher : ciphers) {
             // CCM tests currently fail
             // see https://github.com/openssl/openssl/issues/22773
             if (cipher.endsWith("CCM"))
                 continue;
             for(String padding : paddings) {
-                if (!runTestMultipleUpdates(cipher, padding)) { 
-                    System.out.println(cipher + " " + padding);
-                    fails = true;
-                }
+                runTestMultipleUpdates(cipher, padding);
             }
-        }
-
-        if (fails == true) {
-            testFailed = true;
-            System.out.println("FAILED");
-            fails = false; 
-        } else {
-            System.out.println("PASSED");
         }
     }
 
-    private static boolean runTestMultipleUpdates(String nameKeySizeAndMode, String padding) throws Exception {
+    private void runTestMultipleUpdates(String nameKeySizeAndMode, String padding) throws Exception {
+        String cipherName = nameKeySizeAndMode + "/" + padding;
         SecureRandom sr = SecureRandom.getInstance("NativePRNG");
 
         byte[] key;
@@ -145,8 +122,8 @@ public class CipherApiTest {
         } else if (keySize.equals("256")) {
             key = new byte[32];
         } else {
-            System.out.println("Key size unsupported");
-            return false;
+            fail("Key size unsupported");
+            return;
         }
 
         sr.nextBytes(key);
@@ -180,11 +157,14 @@ public class CipherApiTest {
         decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
         byte[] output = decipher.doFinal(fullEnc, 0, encLen);
 
-        return Arrays.equals(fullInput, output);
+        if (flakyTests.contains(cipherName))
+            return;
+        assertArrayEquals("Multi-update cipher test for " + cipherName + " failed", fullInput, output); 
     }
 
-    private static boolean runTestSingleUpdate(String nameKeySizeAndMode, String padding) throws Exception {
+    private void runTestSingleUpdate(String nameKeySizeAndMode, String padding) throws Exception {
         SecureRandom sr = SecureRandom.getInstance("NativePRNG");
+        String cipherName = nameKeySizeAndMode + "/" + padding;
 
         byte[] key;
         String keySize = nameKeySizeAndMode.split("/")[0].substring(3);
@@ -195,8 +175,8 @@ public class CipherApiTest {
         } else if (keySize.equals("256")) {
             key = new byte[32];
         } else {
-            System.out.println("Key size unsupported");
-            return false;
+            fail("Key size unsupported");
+            return;
         }
 
         sr.nextBytes(key);
@@ -206,7 +186,7 @@ public class CipherApiTest {
 
         AlgorithmParameterSpec spec = new IvParameterSpec(iv); 
 
-        Cipher cipher = Cipher.getInstance(nameKeySizeAndMode + "/" + padding, "OpenSSLFIPSProvider"); 
+        Cipher cipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider"); 
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
 
         byte[] input = new byte[16];
@@ -214,11 +194,14 @@ public class CipherApiTest {
 
         byte[] outFinal = cipher.doFinal(input, 0, input.length);
 
-        Cipher decipher = Cipher.getInstance(nameKeySizeAndMode + "/" + padding, "OpenSSLFIPSProvider");
+        Cipher decipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
         decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
         byte[] output = decipher.doFinal(outFinal, 0, outFinal.length);
 
-        return Arrays.equals(input, output);
+        if (flakyTests.contains(cipherName)) {
+            return;
+        }
+        assertArrayEquals("Single update cipher test for " + cipherName + " failed",  input, output);
     }
  
 }

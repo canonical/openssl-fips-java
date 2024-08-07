@@ -62,8 +62,8 @@ DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_p
     }
     
     EVP_RAND_CTX * context = EVP_RAND_CTX_new(rand, parent == NULL ? NULL : parent->context);
-    EVP_RAND_free(rand);
     if (NULL == context) {
+        EVP_RAND_free(rand);
         fprintf(stderr, "Couldn't allocate EVP_RAND_CTX\n");
         return NULL;
     }
@@ -100,13 +100,26 @@ int free_DRBGParams(DRBGParams *params) {
 }
 
 int free_DRBG(DRBG *generator) {
-    FREE_IF_NON_NULL(generator->seed); 
-    EVP_RAND_CTX_free(generator->context);
-    if (generator->params != NULL)
+    if (generator == NULL) {
+        return 0;
+    }
+
+    FREE_IF_NON_NULL(generator->seed);
+    if (generator->context != NULL) {
+        EVP_RAND_CTX_free(generator->context);
+        generator->context = NULL;
+    }
+
+    if (generator->params != NULL) {
         free_DRBGParams(generator->params);
+        generator->params = NULL;
+    }
+
     if (generator->parent != NULL) {
         free_DRBG(generator->parent);
+        generator->parent = NULL;
     }
+
     free(generator);
     return 1;
 }
