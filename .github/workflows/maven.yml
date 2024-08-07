@@ -35,12 +35,12 @@ jobs:
     - name: Setup OpenSSL configuration
       run: |
         sudo mkdir -p /usr/local/ssl
-        sudo cp ${{ github.workspace }}/test/conf/openssl.cnf /usr/local/ssl/openssl.cnf
+        sudo cp ${{ github.workspace }}/src/test/conf/openssl.cnf /usr/local/ssl/openssl.cnf
     - name: Build with Maven
       run: mvn -B package --file pom.xml
     - name: Upload logfile
       uses: actions/upload-artifact@v2
       if: always()
       with:
-        name: test.out
-        path: ${{ github.workspace }}/build/test/test.out
+        name: maven-surefire-reports
+        path: ${{ github.workspace }}/target/surefire-reports
