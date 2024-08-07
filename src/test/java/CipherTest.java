@@ -41,7 +41,9 @@ public class CipherTest {
         "AES192/GCM/ISO10126_2",
 	"AES128/GCM/PKCS7",
         "AES256/CTR/NONE",
+        "AES128/CBC/NONE",
         "AES128/CBC/PKCS5",
+        "AES128/CTR/PKCS5",
         "AES128/CFB1/X9_23"
     );
 
