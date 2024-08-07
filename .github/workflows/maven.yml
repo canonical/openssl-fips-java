@@ -38,7 +38,7 @@ jobs:
         sudo cp ${{ github.workspace }}/src/test/conf/openssl.cnf /usr/local/ssl/openssl.cnf
     - name: Build with Maven
       env:
-        JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64/
+        JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64/
       run: mvn -B package --file pom.xml
     - name: Upload logfile
       uses: actions/upload-artifact@v2
