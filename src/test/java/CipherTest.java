@@ -37,15 +37,6 @@ import static org.junit.Assert.fail;
 import static org.junit.Assert.assertArrayEquals;
 
 public class CipherTest {
-    List<String> flakyTests = List.of(
-        "AES192/GCM/ISO10126_2",
-	"AES128/GCM/PKCS7",
-        "AES256/CTR/NONE",
-        "AES128/CBC/NONE",
-        "AES128/CBC/PKCS5",
-        "AES128/CTR/PKCS5",
-        "AES128/CFB1/X9_23"
-    );
 
     String [] paddings = {
         "NONE",
@@ -130,7 +121,7 @@ public class CipherTest {
 
         sr.nextBytes(key);
 
-        byte[] iv = new byte[8];
+        byte[] iv = new byte[16];
         sr.nextBytes(iv);
 
         byte[] input = new byte[16];
@@ -159,8 +150,6 @@ public class CipherTest {
         decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
         byte[] output = decipher.doFinal(fullEnc, 0, encLen);
 
-        if (flakyTests.contains(cipherName))
-            return;
         assertArrayEquals("Multi-update cipher test for " + cipherName + " failed", fullInput, output); 
     }
 
@@ -183,7 +172,7 @@ public class CipherTest {
 
         sr.nextBytes(key);
 
-        byte[] iv = new byte[8]; 
+        byte[] iv = new byte[16];
         sr.nextBytes(iv);
 
         AlgorithmParameterSpec spec = new IvParameterSpec(iv); 
@@ -200,9 +189,6 @@ public class CipherTest {
         decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
         byte[] output = decipher.doFinal(outFinal, 0, outFinal.length);
 
-        if (flakyTests.contains(cipherName)) {
-            return;
-        }
         assertArrayEquals("Single update cipher test for " + cipherName + " failed",  input, output);
     }
  
