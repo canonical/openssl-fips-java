@@ -30,6 +30,12 @@ import javax.crypto.ShortBufferException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.BadPaddingException;
 
+/* This implementation will be exercised by the user through the
+ * javax.crypto.Cipher API which isn't marked thread-safe.
+ * This implementation is also NOT thread-safe and applications need
+ * handle thread-safety concerns if need be.
+ */
+
 abstract public class OpenSSLCipher extends CipherSpi {
 
     static {

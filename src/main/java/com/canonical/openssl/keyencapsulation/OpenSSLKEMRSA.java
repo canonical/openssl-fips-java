@@ -36,6 +36,12 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import javax.crypto.spec.SecretKeySpec;
 
+/* This implementation will be exercised by the user through the
+ * javax.crypto.KEM API which isn't marked thread-safe.
+ * This implementation is also NOT thread-safe and applications need
+ * handle thread-safety concerns if need be.
+ */
+
 final public class OpenSSLKEMRSA implements KEMSpi {
 
     static {

@@ -31,6 +31,11 @@ import java.security.SecureRandom;
 import java.security.SignatureException;
 import java.security.SignatureSpi;
 
+/* This implementation will be exercised by the user through the
+ * java.security.Signature API which isn't marked thread-safe.
+ * This implementation is also NOT thread-safe and applications need
+ * handle thread-safety concerns if need be.
+ */
 public abstract class OpenSSLSignature extends SignatureSpi {
 
     static {

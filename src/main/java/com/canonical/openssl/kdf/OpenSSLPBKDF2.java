@@ -41,6 +41,12 @@ import javax.crypto.SecretKeyFactorySpi;
  * can be represented by class PBEKeySpec. As a result, only PBKDF2
  * is implemented in this prototype.
  */
+
+/* This implementation will be exercised by the user through the
+ * javax.crypto.SecretKeyFactory API which isn't marked thread-safe.
+ * This implementation is also NOT thread-safe and applications need
+ * handle any concerns regarding the same.
+ */
 public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
 
     static {

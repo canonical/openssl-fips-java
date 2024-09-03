@@ -26,6 +26,12 @@ import javax.crypto.MacSpi;
 import java.security.spec.AlgorithmParameterSpec;
 import javax.xml.crypto.dsig.spec.HMACParameterSpec;
 
+/* This implementation will be exercised by the user through the
+ * javax.crypto.Mac API which isn't marked thread-safe.
+ * This implementation is also NOT thread-safe and applications need
+ * handle thread-safety concerns if need be.
+ */
+
 public abstract class OpenSSLMAC extends MacSpi {
 
     static {

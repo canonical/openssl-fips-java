@@ -27,6 +27,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Set;
 
+/* This implementation will be exercised by the user through the
+ * java.security.MessageDigest API which isn't marked thread-safe.
+ * This implementation is also NOT thread-safe and applications need
+ * handle thread-safety concerns if need be.
+ */
 public abstract class OpenSSLMD extends MessageDigestSpi {
 
     static {

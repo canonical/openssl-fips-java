@@ -26,6 +26,12 @@ import javax.crypto.KeyAgreementSpi;
 import javax.crypto.SecretKey;
 import java.util.Base64;
 
+/* This implementation will be exercised by the user through the
+ * javax.crypto.KeyAgreement API which isn't marked thread-safe.
+ * This implementation is also NOT thread-safe and applications need
+ * handle thread-safety concerns if need be.
+ */
+
 abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
     static {
         NativeLibraryLoader.load();
