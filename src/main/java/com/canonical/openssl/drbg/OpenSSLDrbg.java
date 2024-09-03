@@ -24,6 +24,11 @@ import java.security.SecureRandomParameters;
 import java.security.DrbgParameters;
 import java.security.Provider;
 
+/* This implementation will be exercised by the user through the
+ * java.security.SecureRandom API which is marked thread-safe.
+ * This implementation is also thread-safe.
+ */
+
 public class OpenSSLDrbg extends SecureRandomSpi {
 
     public static int DEFAULT_STRENGTH = 128;
@@ -34,10 +39,10 @@ public class OpenSSLDrbg extends SecureRandomSpi {
     long drbgContext;
     SecureRandomParameters params;
 
-    private static class DRBGState implements Runnable {
+    private static class NativeDRBG implements Runnable {
         private long nativeHandle;
 
-        DRBGState(long handle) {
+        NativeDRBG(long handle) {
             this.nativeHandle = handle;
         }
 
@@ -50,11 +55,20 @@ public class OpenSSLDrbg extends SecureRandomSpi {
     private Cleaner cleaner = NativeMemoryCleaner.cleaner;
     private Cleaner.Cleanable cleanable;
 
+    // mutex lock for nextBytes(), borrowed from openjdk's NativePRNG
+    private final Object LOCK_GET_BYTES = new Object();
+
+    // mutex lock for generateSeed(), borrowed from openjdk's NativePRNG
+    private final Object LOCK_GET_SEED = new Object();
+
+    // mutex lock for setSeed(), borrowed from openjdk's NativePRNG
+    private final Object LOCK_SET_SEED = new Object();
+
     private OpenSSLDrbg() { }
 
     protected OpenSSLDrbg(String name) {
         drbgContext = init(name, DEFAULT_STRENGTH, false, false, null);
-        cleanable = cleaner.register(this, new DRBGState(drbgContext));
+        cleanable = cleaner.register(this, new NativeDRBG(drbgContext));
     }
 
     protected OpenSSLDrbg(String name, SecureRandomParameters params) throws IllegalArgumentException {
@@ -70,7 +84,7 @@ public class OpenSSLDrbg extends SecureRandomSpi {
         } else {
             this.drbgContext = init(name, DEFAULT_STRENGTH, false, false, null);
         }
-        cleanable = cleaner.register(this, new DRBGState(drbgContext));
+        cleanable = cleaner.register(this, new NativeDRBG(drbgContext));
     }
 
     boolean isInitialized() {
@@ -84,58 +98,72 @@ public class OpenSSLDrbg extends SecureRandomSpi {
 
     @Override
     protected byte[] engineGenerateSeed(int numBytes) {
-        return generateSeed0(numBytes);
+	synchronized (LOCK_GET_SEED) {
+            return generateSeed0(numBytes);
+        }
     }
 
     @Override
     protected void engineNextBytes(byte[] bytes) {
-        nextBytes0(bytes, DEFAULT_STRENGTH, false, null);
+        synchronized (LOCK_GET_BYTES) {
+            nextBytes0(bytes, DEFAULT_STRENGTH, false, null);
+        }
     }
 
     protected void engineNextBytes(byte[] bytes, SecureRandomParameters params) throws IllegalArgumentException {
-        if (params == null) {
-            engineNextBytes(bytes);
-            return;
-        }
+        synchronized (LOCK_GET_BYTES) {
+            if (params == null) {
+                engineNextBytes(bytes);
+                return;
+            }
 
-        if (!(params instanceof DrbgParameters.NextBytes)) {
-            throw new IllegalArgumentException("Parameters of type DrbgParameters.NextByte expected, passed " + params.getClass());
-        }
+            if (!(params instanceof DrbgParameters.NextBytes)) {
+                throw new IllegalArgumentException("Parameters of type DrbgParameters.NextByte expected, passed " + params.getClass());
+            }
 
-        DrbgParameters.NextBytes nb = (DrbgParameters.NextBytes)params;
-        nextBytes0(bytes, nb.getStrength(), nb.getPredictionResistance(), nb.getAdditionalInput());
+            DrbgParameters.NextBytes nb = (DrbgParameters.NextBytes)params;
+            nextBytes0(bytes, nb.getStrength(), nb.getPredictionResistance(), nb.getAdditionalInput());
+        }
     }
 
     protected void engineReseed() {
-        reseed0(null, false, null);
+        synchronized (LOCK_SET_SEED) {
+            reseed0(null, false, null);
+        }
     }
 
     @Override
     protected void engineReseed(SecureRandomParameters params) throws IllegalArgumentException {
-        if (params == null) {
-            engineReseed();
-            return;
-        }
+        synchronized (LOCK_SET_SEED) {
+            if (params == null) {
+                engineReseed();
+                return;
+            }
         
-        if (!(params instanceof DrbgParameters.Reseed)) {
-            throw new IllegalArgumentException("Parameters of type DrbgParameters.Reseed expected, passed " + params.getClass());    
+            if (!(params instanceof DrbgParameters.Reseed)) {
+                throw new IllegalArgumentException("Parameters of type DrbgParameters.Reseed expected, passed " + params.getClass());
+            }
+            DrbgParameters.Reseed rs = (DrbgParameters.Reseed)params;
+            reseed0(null, rs.getPredictionResistance(), rs.getAdditionalInput());
         }
-        DrbgParameters.Reseed rs = (DrbgParameters.Reseed)params;
-        reseed0(null, rs.getPredictionResistance(), rs.getAdditionalInput());
     }
 
     protected void engineSetSeed(byte[] seed) {
-        reseed0(seed, false, null);
+        synchronized (LOCK_SET_SEED) {
+            reseed0(seed, false, null);
+        }
     }
 
     protected void engineSetSeed(long seed) {
-        byte [] seedBytes = new byte[8];
-        for (int i = 0; i < 8; i++) {
-             seedBytes[i] = (byte)(seed & (long)0xff);
-             seed = seed >> 8; 
-        }
+        synchronized (LOCK_SET_SEED) {
+            byte [] seedBytes = new byte[8];
+            for (int i = 0; i < 8; i++) {
+                seedBytes[i] = (byte)(seed & (long)0xff);
+                seed = seed >> 8;
+            }
 
-        engineSetSeed(seedBytes);
+            engineSetSeed(seedBytes);
+        }
     }
 
     private static void cleanupNativeMemory(long handle) {
