@@ -29,19 +29,21 @@ jobs:
     - name: Install OpenSSL FIPS
       run: |
         git clone https://github.com/openssl/openssl && cd openssl
-        git checkout openssl-3.0
+        git checkout openssl-3.0.2
         sudo apt update && sudo apt install build-essential -y
         ./Configure enable-fips && make && sudo make install && sudo make install_fips
     - name: Setup OpenSSL configuration
       run: |
         sudo mkdir -p /usr/local/ssl
+        sudo openssl fipsinstall -out /usr/local/ssl/fipsmodule.cnf -module /usr/local/lib64/ossl-modules/fips.so
+        sudo cat /usr/local/ssl/fipsmodule.cnf
         sudo cp ${{ github.workspace }}/src/test/conf/openssl.cnf /usr/local/ssl/openssl.cnf
     - name: Build with Maven
       env:
         JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64/
       run: mvn -B package --file pom.xml
     - name: Upload logfile
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: maven-surefire-reports
