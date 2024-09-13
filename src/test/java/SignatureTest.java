@@ -60,14 +60,12 @@ public class SignatureTest {
         testSignature("RSA", gen.pubKey, gen.privKey);
     }
 
-    @Test
     public void testED25519() throws Exception {
         EdDSAPublicKey publicKey = new EdDSAPublicKey("src/test/keys/ed25519-pub.pem");
         EdDSAPrivateKey privateKey = new EdDSAPrivateKey("src/test/keys/ed25519-priv.pem");
         testSignature("ED25519", publicKey, privateKey);
     }
 
-    @Test
     public void testED448() throws Exception {
         EdDSAPublicKey publicKey = new EdDSAPublicKey("src/test/keys/ed448-pub.pem");
         EdDSAPrivateKey privateKey = new EdDSAPrivateKey("src/test/keys/ed448-priv.pem");

@@ -152,7 +152,7 @@ void test_ed448_sign_and_verify(OSSL_LIB_CTX *libctx) {
 int main(int argc, char ** argv) {
     OSSL_LIB_CTX *libctx = load_openssl_fips_provider("/usr/local/ssl/openssl.cnf"); 
     test_rsa_sign_and_verify(libctx);
-    test_ed25519_sign_and_verify(libctx);
-    test_ed448_sign_and_verify(libctx);
+    //test_ed25519_sign_and_verify(libctx);
+    //test_ed448_sign_and_verify(libctx);
     return rc;
 }

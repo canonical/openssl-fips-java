@@ -22,6 +22,10 @@
 sv_key *sv_init_key(OSSL_LIB_CTX *libctx, EVP_PKEY *pkey) {
     sv_key *key = (sv_key*)malloc(sizeof(sv_key));
     key->ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey, NULL);
+    if (key->ctx == NULL) {
+        ERR_print_errors_fp(stderr);
+        return NULL;
+    }
     return key;
 }
   
