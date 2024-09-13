@@ -34,6 +34,14 @@ OSSL_LIB_CTX *global_libctx = NULL;
 
 OSSL_LIB_CTX* load_openssl_provider(const char *name, const char* conf_file_path) {
     OSSL_LIB_CTX *libctx = OSSL_LIB_CTX_new();
+
+    if (OSSL_PROVIDER_available(libctx, "fips")) {
+        // The FIPS module has been loaded by default.
+        // The base module should also be loaded and the default model not loaded.
+        // There's nothing more to do. This is the Ubuntu Pro setup.
+        return libctx;
+    }
+
     if (!OSSL_LIB_CTX_load_config(libctx, conf_file_path)) {
         ERR_print_errors_fp(stderr);
     }
@@ -43,7 +51,7 @@ OSSL_LIB_CTX* load_openssl_provider(const char *name, const char* conf_file_path
         fprintf(stderr, "Failed to load the %s provider:\n", name);
         ERR_print_errors_fp(stderr);
     }
-    
+
     return libctx;
 }
 
