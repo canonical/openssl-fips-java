@@ -57,7 +57,7 @@ static unsigned char data[] =
 
 void run_test(mac_context *ctx) {
     if (NULL == ctx) {
-        printf("FAILED (Couldn't init CMAC)\n");
+        printf("FAILED (Couldn't init MAC)\n");
     }
 
     if(0 == (mac_update(ctx, data, sizeof(data)))) {
@@ -117,7 +117,7 @@ void test_gmac(OSSL_LIB_CTX *libctx) {
 
 void test_kmac128(OSSL_LIB_CTX *libctx) {
     printf("Testing KMAC-128: ");
-    mac_context *ctx = mac_init("KMAC-128", key, 4, NULL);
+    mac_context *ctx = mac_init("KMAC-128", key, 16, NULL);
     run_test(ctx);
     free_mac_context(ctx);
 }

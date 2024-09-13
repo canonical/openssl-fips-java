@@ -112,7 +112,7 @@ public class MacTest {
     @Test
     public void testKMAC_128() throws Exception {
         runTest("KMAC-128",
-            new SecretKeySpec(Arrays.copyOfRange(key, 0, 4), "KMAC-128"),
+            new SecretKeySpec(Arrays.copyOfRange(key, 0, 16), "KMAC-128"),
             "KMAC128");
     }
 

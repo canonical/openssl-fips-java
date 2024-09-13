@@ -44,7 +44,7 @@ static void set_params(EVP_MAC_CTX *ctx, mac_params *params) {
     }
     _params[n_params] = OSSL_PARAM_construct_end();
     if (0 == EVP_MAC_CTX_set_params(ctx, _params)) {
-        ERR_print_errors_fp(stdout);
+        ERR_print_errors_fp(stderr);
     }
 }
 
@@ -55,7 +55,7 @@ mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params 
     EVP_MAC_CTX *ctx = EVP_MAC_CTX_new(mac);
     EVP_MAC_free(mac);
     if (NULL == ctx) { 
-        ERR_print_errors_fp(stdout);        
+        ERR_print_errors_fp(stderr);
         free_mac_context(new_ctx);
         return NULL;
     }
@@ -64,7 +64,7 @@ mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params 
         set_params(new_ctx->ctx, params);
     }
     if (0 == EVP_MAC_init(new_ctx->ctx, (const unsigned char*)key, key_length, NULL)) {
-        ERR_print_errors_fp(stdout);
+        ERR_print_errors_fp(stderr);
         free_mac_context(new_ctx);
         return NULL;
     }   
