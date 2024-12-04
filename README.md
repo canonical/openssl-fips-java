@@ -37,6 +37,7 @@ This set of commands may be used on Ubuntu/Debian systems.
 git clone https://github.com/canonical/openssl-fips-java
 cd openssl-fips-java
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64/
+export OPENSSL_MODULES=/usr/local/lib64/ossl-modules
 mvn -B package --file pom.xml
 ```
 Refer to this [GitHub Action](https://github.com/canonical/openssl-fips-java/blob/main/.github/workflows/maven.yml) for more details.
