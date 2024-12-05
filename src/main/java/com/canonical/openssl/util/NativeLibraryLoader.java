@@ -21,6 +21,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 
 public class NativeLibraryLoader {
     static String libFileName = "libjssl.so";
@@ -34,7 +35,7 @@ public class NativeLibraryLoader {
         try {
             InputStream in = NativeLibraryLoader.class.getResourceAsStream(location + libFileName);
 
-            File tempFile = Files.createTempFile(libFileName, "").toFile();
+            File tempFile = Files.createFile(Paths.get("/tmp/" + libFileName)).toFile();
             tempFile.deleteOnExit();
 
             try (FileOutputStream out = new FileOutputStream(tempFile)) {
@@ -44,6 +45,7 @@ public class NativeLibraryLoader {
                     out.write(buffer, 0, bytesRead);
                 }
             }
+
             System.load(tempFile.getAbsolutePath());
             loaded = true;
         } catch (Exception e) {
