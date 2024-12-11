@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include "com_canonical_openssl_drbg_OpenSSLDrbg.h"
+#include "OpenSSLDrbg.h"
 #include "drbg.h"
 
 /* TODOs

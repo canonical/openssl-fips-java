@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include "com_canonical_openssl_md_OpenSSLMD.h"
+#include "OpenSSLMD.h"
 #include "jssl.h"
 #include "md.h"
 #include "jni_utils.h"

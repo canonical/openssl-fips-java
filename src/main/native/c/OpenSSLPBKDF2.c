@@ -16,7 +16,7 @@
  */
 #include "jni_utils.h" 
 #include "kdf.h"
-#include "com_canonical_openssl_kdf_OpenSSLPBKDF2.h"
+#include "OpenSSLPBKDF2.h"
 
 #define MAX_KEY_SIZE 64
 extern OSSL_LIB_CTX *global_libctx;

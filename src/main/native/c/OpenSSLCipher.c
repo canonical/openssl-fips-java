@@ -17,7 +17,7 @@
 #include <jni.h>
 #include "jssl.h"
 #include "cipher.h"
-#include "com_canonical_openssl_cipher_OpenSSLCipher.h"
+#include "OpenSSLCipher.h"
 
 #define LARGE_SIZE 1024
 extern OSSL_LIB_CTX *global_libctx;

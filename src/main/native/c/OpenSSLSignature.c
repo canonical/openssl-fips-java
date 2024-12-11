@@ -15,7 +15,7 @@
  *
  */
 #include "jssl.h"
-#include "com_canonical_openssl_signature_OpenSSLSignature.h"
+#include "OpenSSLSignature.h"
 #include "signature.h"
 #include "evp_utils.h"
 #include "jni_utils.h"

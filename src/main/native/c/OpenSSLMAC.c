@@ -16,7 +16,7 @@
  */
 #include "jssl.h"
 #include "mac.h"
-#include "com_canonical_openssl_mac_OpenSSLMAC.h"
+#include "OpenSSLMAC.h"
 #include "jni_utils.h"
 
 #define MAX_OUTPUT_LEN 512

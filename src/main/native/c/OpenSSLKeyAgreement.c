@@ -17,7 +17,7 @@
 #include <jni.h>
 #include "jssl.h"
 #include "keyagreement.h"
-#include "com_canonical_openssl_keyagreement_OpenSSLKeyAgreement.h"
+#include "OpenSSLKeyAgreement.h"
 #include "evp_utils.h"
 #include "jni_utils.h"
 

@@ -17,7 +17,7 @@
 #include <jni.h>
 #include "jssl.h"
 #include "keyencapsulation.h"
-#include "com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA_RSAKEMEncapsulator.h"
+#include "RSAKEMEncapsulator.h"
 #include "evp_utils.h"
 #include "jni_utils.h"
 
