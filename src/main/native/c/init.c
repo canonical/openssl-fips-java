@@ -66,10 +66,11 @@ OSSL_LIB_CTX* load_openssl_base_provider(const char* conf_file_path) {
 
 int JNI_OnLoad(JavaVM* vm, void *reserved) {
     const char *default_cnf = "/usr/local/ssl/openssl.cnf";
-    char *cnf = getenv("OPENSSL_CUSTOM_CONF");
-    if (cnf == NULL) {
-        cnf = default_cnf;
+    const char *custom_cnf = getenv("OPENSSL_CUSTOM_CONF");
+    if (custom_cnf != NULL) {
+        global_libctx = load_openssl_fips_provider(custom_cnf);
+    } else {
+        global_libctx = load_openssl_fips_provider(default_cnf);
     }
-    global_libctx = load_openssl_fips_provider(cnf);
-    return JNI_VERSION_21;
+    return JNI_VERSION_10;
 }

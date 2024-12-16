@@ -36,7 +36,6 @@ public class NativeLibraryLoader {
             InputStream in = NativeLibraryLoader.class.getResourceAsStream(location + libFileName);
 
             File tempFile = Files.createFile(Paths.get("/tmp/" + libFileName)).toFile();
-            tempFile.deleteOnExit();
 
             try (FileOutputStream out = new FileOutputStream(tempFile)) {
                 byte[] buffer = new byte[1024];
@@ -48,6 +47,8 @@ public class NativeLibraryLoader {
 
             System.load(tempFile.getAbsolutePath());
             loaded = true;
+
+            tempFile.delete();
         } catch (Exception e) {
             throw new RuntimeException("Failed to load native libary " + libFileName + ": " + e);
         }

@@ -15,8 +15,10 @@ parts:
     source: .
     maven-parameters:
       - -DskipTests=true -DskipGenerateTestResources=true -B package --file pom.xml
+    build-environment:
+      - JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
     build-packages:
-      - openjdk-21-jdk
+      - openjdk-17-jdk-headless
       - maven
       - libssl-dev
 

@@ -1,5 +1,5 @@
 ### Introduction
-The OpenSSL FIPS Java project is a Java FIPS security provider module layered on top of the [OpenSSL library and its FIPS module](https://docs.openssl.org/3.0/man7/OSSL_PROVIDER-FIPS/). Complying with the [Java Cryptography Architecture](https://docs.oracle.com/javase/8/docs/technotes/guides/security/crypto/CryptoSpec.html), it implements the Java security SPI classes for security functions including [Deterministic Random Bit Generators](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/SecureRandomSpi.html), [Ciphers](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/CipherSpi.html), [Key Agreements](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/KeyAgreementSpi.html), [Key Derivations](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/SecretKeyFactorySpi.html), [Key Encapsulation](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/KEMSpi.html), [Message Digests](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/MessageDigest.html#:~:text=Message%20digests%20are%20secure%20one,called%20to%20reset%20the%20digest.), [Message Authentication Codes](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/crypto/Mac.html) and [Signatures](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/security/Signature.html?source=%3Aso%3Atw%3Aor%3Aawr%3Aosec%3A%2C%3Aso%3Atw%3Aor%3Aawr%3Aosec%3A).
+The OpenSSL FIPS Java project is a Java FIPS security provider module layered on top of the [OpenSSL library and its FIPS module](https://docs.openssl.org/3.0/man7/OSSL_PROVIDER-FIPS/). Complying with the [Java Cryptography Architecture](https://docs.oracle.com/javase/8/docs/technotes/guides/security/crypto/CryptoSpec.html), it implements the Java security SPI classes for security functions including [Deterministic Random Bit Generators](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/security/SecureRandomSpi.html), [Ciphers](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/javax/crypto/CipherSpi.html), [Key Agreements](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/javax/crypto/KeyAgreementSpi.html), [Key Derivations](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/javax/crypto/SecretKeyFactorySpi.html), [Key Encapsulation](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/javax/crypto/KEMSpi.html), [Message Digests](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/security/MessageDigest.html#:~:text=Message%20digests%20are%20secure%20one,called%20to%20reset%20the%20digest.), [Message Authentication Codes](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/javax/crypto/Mac.html) and [Signatures](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/security/Signature.html?source=%3Aso%3Atw%3Aor%3Aawr%3Aosec%3A%2C%3Aso%3Atw%3Aor%3Aawr%3Aosec%3A).
 
 Under the covers, OpenSSL FIPS Java is quite tightly coupled with OpenSSL through the [Java Native Interface](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/intro.html) and the [OpenSSL EVP API](https://docs.openssl.org/3.3/man7/evp/). Only FIPS-approved algorithms, offered by the OpenSSL FIPS module are registered with this provider. The binaries produced from this source should be generally considered FIPS-compliant if the underlying OpenSSL module is FIPS 140-2/140-3 certified.
 
@@ -48,17 +48,17 @@ base = base_sect
 [algorithm_sect]
 default_properties = fips=yes
 ```
-#### Install OpenJDK v21
-This project needs OpenJDK 21 or a later release of it. On Ubuntu/Debian systems, you may install the OpenJDK from the archive.
+#### Install OpenJDK v17
+This project needs OpenJDK 17 or a later release of it. On Ubuntu/Debian systems, you may install the OpenJDK from the archive.
 ```
 sudo apt update
-sudo apt install openjdk-21-jdk-headless
+sudo apt install openjdk-17-jdk-headless
 ```
 #### Clone the project, build and test
 This set of commands may be used on Ubuntu/Debian systems.
 ```
 git clone https://github.com/canonical/openssl-fips-java && cd openssl-fips-java
-export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64/
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64/
 export OPENSSL_MODULES=/usr/local/lib64/ossl-modules
 mvn -B package --file pom.xml
 ```

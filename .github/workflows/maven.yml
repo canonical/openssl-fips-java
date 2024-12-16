@@ -24,8 +24,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up JDK 21
-      run: sudo apt-get update && sudo apt-get install -y openjdk-21-jdk-headless
+    - name: Set up JDK 17
+      run: sudo apt-get update && sudo apt-get install -y openjdk-17-jdk-headless
     - name: Install OpenSSL FIPS
       run: |
         git clone https://github.com/openssl/openssl && cd openssl
@@ -38,9 +38,9 @@ jobs:
         sudo openssl fipsinstall -out /usr/local/ssl/fipsmodule.cnf -module /usr/local/lib64/ossl-modules/fips.so
         sudo cat /usr/local/ssl/fipsmodule.cnf
         sudo cp ${{ github.workspace }}/src/test/conf/openssl.cnf /usr/local/ssl/openssl.cnf
-    - name: Build with Maven
+    - name: Build with Maven/JDK 17
       env:
-        JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64/
+        JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64/
       run: mvn -B package --file pom.xml
     - name: Upload logfile
       uses: actions/upload-artifact@v4
