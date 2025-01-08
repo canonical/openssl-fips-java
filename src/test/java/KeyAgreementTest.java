@@ -37,17 +37,23 @@ public class KeyAgreementTest {
     }
 
     private void runTest(KeyPairGenerator kpg, String algo) throws Exception {
-        KeyPair aliceKp = kpg.generateKeyPair();
-        KeyPair bobKp = kpg.generateKeyPair();
         KeyAgreement aliceAgreement = KeyAgreement.getInstance(algo, "OpenSSLFIPSProvider");
         KeyAgreement bobAgreement = KeyAgreement.getInstance(algo, "OpenSSLFIPSProvider");
-        aliceAgreement.init(aliceKp.getPrivate());
-        aliceAgreement.doPhase(bobKp.getPublic(), true);
-        bobAgreement.init(bobKp.getPrivate());
-        bobAgreement.doPhase(aliceKp.getPublic(), true);
-        byte[] aliceSecret = aliceAgreement.generateSecret();
-        byte[] bobSecret = bobAgreement.generateSecret();
-        assertArrayEquals("Key Agreement test for " + algo +  " failed", aliceSecret, bobSecret);
+
+        for (int i = 0; i < 2; i++) {
+            KeyPair aliceKp = kpg.generateKeyPair();
+            KeyPair bobKp = kpg.generateKeyPair();
+            aliceAgreement.init(aliceKp.getPrivate());
+            aliceAgreement.doPhase(bobKp.getPublic(), true);
+            bobAgreement.init(bobKp.getPrivate());
+            bobAgreement.doPhase(aliceKp.getPublic(), true);
+            byte[] aliceSecret = aliceAgreement.generateSecret();
+            byte[] bobSecret = bobAgreement.generateSecret();
+            assertArrayEquals("Key Agreement test for " + algo +  " failed", aliceSecret, bobSecret);
+
+            // make sure generateSecret() resets the KeyAgreement object
+            // and can be reused for another agreement
+        }
     }
 
     @Test
