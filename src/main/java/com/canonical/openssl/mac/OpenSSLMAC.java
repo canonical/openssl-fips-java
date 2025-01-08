@@ -64,6 +64,8 @@ public abstract class OpenSSLMAC extends MacSpi {
 
     private static Cleaner cleaner = NativeMemoryCleaner.cleaner;
     private Cleaner.Cleanable cleanable;
+    private int outputLength = -1;
+    private Key key;
 
     @Override
     protected byte[] engineDoFinal() {
@@ -77,9 +79,9 @@ public abstract class OpenSSLMAC extends MacSpi {
 
     @Override
     protected void engineInit(Key key, AlgorithmParameterSpec spec) {
-        var outputLength = -1;
+        this.key = key;
         if (spec != null && isHMAC(this) && spec instanceof HMACParameterSpec hmacSpec) {
-            outputLength = hmacSpec.getOutputLength();
+            this.outputLength = hmacSpec.getOutputLength();
         }
         nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), getIV(), outputLength, key.getEncoded());
         cleanable = cleaner.register(this, new MACState(nativeHandle));
@@ -87,7 +89,8 @@ public abstract class OpenSSLMAC extends MacSpi {
 
     @Override
     protected void engineReset() {
-        // TODO
+        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), getIV(), this.outputLength, this.key.getEncoded());
+        cleanable = cleaner.register(this, new MACState(nativeHandle));
     }
 
     @Override
