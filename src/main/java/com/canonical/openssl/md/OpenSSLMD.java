@@ -81,7 +81,8 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
 
     @Override
     protected void engineReset() {
-        // TODO
+        nativeHandle = doInit0(mdName);
+        cleanable = cleaner.register(nativeHandle, new MDState(nativeHandle));
     }
 
     @Override
