@@ -21,6 +21,7 @@ import java.util.function.*;
 import java.util.List;
 import java.security.Security;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
 import org.junit.Test;
@@ -28,7 +29,9 @@ import org.junit.BeforeClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class MDTest {
 
@@ -58,6 +61,64 @@ public class MDTest {
             byte[] output3 = mdCompute.apply(md3, input1);
             assertArrayEquals("Test for Message Digest "  + name + " failed.", output1, output2);
             assertFalse("Test for Message Digest " + name + " failed.", Arrays.equals(output2, output3));
+        }
+    }
+
+    @Test
+    public void messageDigestElaborateTest() throws Exception {
+        SecureRandom hmac = SecureRandom.getInstance("HashSHA512","OpenSSLFIPSProvider");
+        for (String name: List.of("MDSHA1", "MDSHA224", "MDSHA3_384", "MDSHA3_512")) {
+            byte[] bytes1 = new byte[10240];
+            hmac.nextBytes(bytes1);
+
+            byte[] bytes2 = new byte[10240];
+            hmac.nextBytes(bytes2);
+
+            byte[] bytes3 = new byte[20480];
+            hmac.nextBytes(bytes3);
+
+            byte[] bytes4 = new byte[10240];
+            hmac.nextBytes(bytes4);
+
+            MessageDigest md = MessageDigest.getInstance(name, "OpenSSLFIPSProvider");
+
+            // update 1
+            for (byte b : bytes1) {
+                md.update(b);
+            }
+
+            // update 2
+            md.update(bytes2);
+
+            // update 3
+            md.update(bytes3, 100, 10240);
+
+            // update 4
+            md.update(ByteBuffer.wrap(bytes4));
+
+            // get digest
+            byte[] digest1 = md.digest();
+
+            // reset
+            md.reset();
+
+            // update 1
+            md.update(ByteBuffer.wrap(bytes1));
+
+            // update 2
+            for (byte b : bytes2) {
+                md.update(b);
+            }
+
+            // update 3
+            md.update(bytes3, 100, 10240);
+
+            // update 4 and get digest
+            byte[] digest2 = md.digest(bytes4);
+
+            assertEquals("Elaborate test for Message Digest " + name + " failed.", md.getDigestLength(), digest2.length);
+            assertTrue("Elaborate test for Message Digest " + name + " failed.", MessageDigest.isEqual(digest1, digest2));
+
         }
     }
 
