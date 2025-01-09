@@ -28,6 +28,8 @@ import org.junit.Test;
 import org.junit.BeforeClass;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class SecretKeyFactoryTest {
 
@@ -46,6 +48,12 @@ public class SecretKeyFactoryTest {
         SecretKey sk2 = pbkdf.translateKey(sk1);
         assertNotEquals("SecretKey is of length 0", sk1.getEncoded().length, 0);
         assertArrayEquals("Invalid secret key", sk1.getEncoded(), sk2.getEncoded());
+
+        KeySpec spec = pbkdf.getKeySpec(sk2, PBEKeySpec.class);
+        assertTrue("Returned KeySpec is not of the expected type", spec instanceof PBEKeySpec);
+        assertEquals("Returned KeySpec does not match original KeySpec", ((PBEKeySpec)spec).getIterationCount(), 120000);
+        assertArrayEquals("Returned KeySpec does not match original KeySpec", ((PBEKeySpec)spec).getPassword(), password.toCharArray());
+        assertArrayEquals("Returned KeySpec does not match original KeySpec", ((PBEKeySpec)spec).getSalt(), salt.getBytes());
     }
 
     @BeforeClass
