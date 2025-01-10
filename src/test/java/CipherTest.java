@@ -35,6 +35,7 @@ import org.junit.Test;
 import org.junit.BeforeClass;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
 public class CipherTest {
 
@@ -156,6 +157,138 @@ public class CipherTest {
     private void runTestSingleUpdate(String nameKeySizeAndMode, String padding) throws Exception {
         SecureRandom sr = SecureRandom.getInstance("NativePRNG");
         String cipherName = nameKeySizeAndMode + "/" + padding;
+        Cipher cipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+
+        byte[] key;
+        String keySize = nameKeySizeAndMode.split("/")[0].substring(3);
+        if (keySize.equals("128")) {
+            key = new byte[16];
+        } else if (keySize.equals("192")) {
+            key = new byte[24];
+        } else if (keySize.equals("256")) {
+            key = new byte[32];
+        } else {
+            fail("Key size unsupported");
+            return;
+        }
+
+        sr.nextBytes(key);
+
+        byte[] iv = new byte[16];
+        sr.nextBytes(iv);
+        AlgorithmParameterSpec spec = new IvParameterSpec(iv); 
+
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
+
+        byte[] input = new byte[16];
+        sr.nextBytes(input);
+
+        byte[] outFinal = cipher.doFinal(input, 0, input.length);
+
+        Cipher decipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+        decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
+        byte[] output = decipher.doFinal(outFinal, 0, outFinal.length);
+
+        assertArrayEquals("Single update cipher test for " + cipherName + " failed",  input, output);
+    }
+
+    private void runTestGetOutputSize(String nameKeySizeAndMode, String padding) throws Exception {
+        String cipherName = nameKeySizeAndMode + "/" + padding;
+        SecureRandom sr = SecureRandom.getInstance("NativePRNG");
+
+        byte[] key;
+        String keySize = nameKeySizeAndMode.split("/")[0].substring(3);
+        if (keySize.equals("128")) {
+            key = new byte[16];
+        } else if (keySize.equals("192")) {
+            key = new byte[24];
+        } else if (keySize.equals("256")) {
+            key = new byte[32];
+        } else {
+            fail("Key size unsupported");
+            return;
+        }
+
+        sr.nextBytes(key);
+
+        byte[] iv = new byte[16];
+        sr.nextBytes(iv);
+        AlgorithmParameterSpec spec = new IvParameterSpec(iv);
+
+        Cipher cipher = Cipher.getInstance(nameKeySizeAndMode + "/" + padding, "OpenSSLFIPSProvider");
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
+
+        int inputSize = 512;
+        if (!padding.equals("NONE")) {
+            inputSize = 511;
+        }
+        byte[] input = new byte[inputSize];
+        sr.nextBytes(input);
+
+        byte[] fullInput = new byte[inputSize*2];
+        System.arraycopy(input, 0, fullInput, 0, inputSize);
+        System.arraycopy(input, 0, fullInput, inputSize, inputSize);
+
+        byte[] fullEnc = new byte[cipher.getOutputSize(inputSize*2)];
+        int encLen = 0;
+
+        byte[] enc1 = cipher.update(input, 0, input.length);
+        System.arraycopy(enc1, 0, fullEnc, 0, enc1.length);
+        encLen += enc1.length;
+
+        byte[] enc2 = cipher.doFinal(input, 0, input.length);
+        System.arraycopy(enc2, 0, fullEnc, encLen, enc2.length);
+        encLen += enc2.length;
+
+        assertEquals("Encrypted text has an unexpected length for " + cipherName, encLen, cipher.getOutputSize(inputSize*2));
+
+        Cipher decipher = Cipher.getInstance(nameKeySizeAndMode + "/" + padding, "OpenSSLFIPSProvider");
+        decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
+        byte[] output = decipher.doFinal(fullEnc, 0, fullEnc.length);
+        assertArrayEquals("Multi-update cipher test for " + cipherName + " failed", fullInput, output);
+    }
+
+    @Test
+    public void testBlockSize() throws Exception {
+        for (String cipher : ciphers) {
+            for(String padding : paddings) {
+                runTestBlockSize(cipher, padding);
+            }
+        }
+    }
+
+    @Test
+    public void testGetOutputSize() throws Exception {
+        for (String cipher : ciphers) {
+            if (cipher.endsWith("CCM"))
+                continue;
+
+            for(String padding : paddings) {
+                runTestGetOutputSize(cipher, padding);
+            }
+        }
+    }
+
+    @Test
+    public void testGetIV() throws Exception {
+        for (String cipher : ciphers) {
+            for(String padding : paddings) {
+                runTestGetIV(cipher, padding);
+            }
+        }
+    }
+
+    private void runTestBlockSize(String cipherName, String padding) throws Exception {
+        String fullName = cipherName + "/" + padding;
+        Cipher cipher = Cipher.getInstance(fullName, "OpenSSLFIPSProvider");
+        assertEquals("Invalid block size", cipher.getBlockSize(), 16);
+    }
+
+    private void runTestGetIV(String nameKeySizeAndMode, String padding) throws Exception {
+        SecureRandom sr = SecureRandom.getInstance("NativePRNG");
+        String cipherName = nameKeySizeAndMode + "/" + padding;
+
+        Cipher cipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
 
         byte[] key;
         String keySize = nameKeySizeAndMode.split("/")[0].substring(3);
@@ -175,24 +308,10 @@ public class CipherTest {
         byte[] iv = new byte[16];
         sr.nextBytes(iv);
 
-        AlgorithmParameterSpec spec = new IvParameterSpec(iv); 
+        AlgorithmParameterSpec spec = new IvParameterSpec(iv);
 
-        Cipher cipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider"); 
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
-
-        byte[] input = new byte[16];
-        sr.nextBytes(input);
-
-        byte[] outFinal = cipher.doFinal(input, 0, input.length);
-
-        Cipher decipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
-        decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
-        byte[] output = decipher.doFinal(outFinal, 0, outFinal.length);
-
-        assertArrayEquals("Single update cipher test for " + cipherName + " failed",  input, output);
+        byte[] retIV = cipher.getIV();
+        assertArrayEquals("Returned IV does not match supplied IV", iv, retIV);
     }
- 
 }
-        
-
-
