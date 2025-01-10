@@ -39,6 +39,15 @@ public abstract class CipherAes extends OpenSSLCipher {
 
     @Override
     protected int engineGetOutputSize(int inputSize) {
+        if(getPadding().equals("NONE"))
+            return inputSize;
+
+        int blockSize = engineGetBlockSize();
+        if(getMode().equals("CBC") || getMode().equals("ECB")) {
+            int paddingLength = (blockSize - (inputSize % blockSize)) % blockSize;
+            return inputSize + paddingLength;
+        }
+
         return inputSize;
     }
 }
