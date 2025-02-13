@@ -20,6 +20,7 @@
 
 #define DECRYPT 0
 #define ENCRYPT 1 
+#define GCM_TAG_LEN 16
 
 typedef struct cipher_context {
     const char *name;
@@ -27,6 +28,7 @@ typedef struct cipher_context {
     EVP_CIPHER* cipher;
     int mode;
     int padding;
+    byte gcm_tag[GCM_TAG_LEN];
 } cipher_context;
 
 cipher_context* create_cipher_context(OSSL_LIB_CTX *libctx, const char *name, const char *padding_name);
