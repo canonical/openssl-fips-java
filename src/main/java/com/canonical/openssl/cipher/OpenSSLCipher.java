@@ -19,6 +19,7 @@ package com.canonical.openssl.cipher;
 import com.canonical.openssl.util.NativeMemoryCleaner;
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
+import java.nio.ByteBuffer;
 import javax.crypto.CipherSpi;
 import javax.crypto.Cipher;
 import java.security.Key;
@@ -85,6 +86,11 @@ abstract public class OpenSSLCipher extends CipherSpi {
         return mode.equals("CCM");
     }
 
+    private boolean isAADSupported() {
+        // Among FIPS approved Ciphers, only -CCM and -GCM mode ciphers support AAD
+        return mode.equals("CCM") || mode.equals("GCM");
+    }
+
     @Override
     protected void engineInit(int opmode, Key key, AlgorithmParameters params, SecureRandom random) {
         System.err.println("AlgorithmParameters will be ignored by the prototype");
@@ -124,9 +130,9 @@ abstract public class OpenSSLCipher extends CipherSpi {
     @Override
     protected byte[] engineUpdate(byte[] bytes, int offset, int length) {
         if (isModeCCM() && firstUpdate) {
-            firstUpdate = false;
             doInit0(bytes, offset, length, keyBytes, iv, opmode);
-        } 
+        }
+        firstUpdate = false;
         inputSize += length; 
         byte[] ret = doUpdate0(bytes, offset, length);
         outputSize += ret.length;
@@ -168,6 +174,26 @@ abstract public class OpenSSLCipher extends CipherSpi {
         return doFinal0(transformed, transformed.length);  
     }
 
+    @Override
+    protected void engineUpdateAAD(byte[] aad, int offset, int len) {
+        if (!firstUpdate) {
+            throw new IllegalStateException("An update() method has already been called");
+        }
+
+        if (!isAADSupported()) {
+            throw new IllegalStateException("Cipher: " + name + "-" + mode + " does not support Additional Authentication Data");
+        }
+
+        updateAAD0(aad, offset, len);
+
+    }
+
+    @Override
+    protected void engineUpdateAAD(ByteBuffer src) {
+        byte[] aad = src.array();
+        updateAAD0(aad, 0, aad.length);
+    }
+
     private static void cleanupNativeMemory(long handle) {
         cleanupNativeMemory0(handle);
     }
@@ -177,5 +203,6 @@ abstract public class OpenSSLCipher extends CipherSpi {
     native long createContext0(String nameAndMode, String padding);
     native void doInit0(byte[] input, int offset, int length, byte[] key, byte[] iv, int opmode);
     native byte[] doUpdate0(byte[] input, int offset, int length);
+    native byte[] updateAAD0(byte[] aad, int offset, int len);
     native byte[] doFinal0(byte[] output, int length);
 }

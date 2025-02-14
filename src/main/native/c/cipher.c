@@ -20,6 +20,8 @@
 
 #define IS_MODE_CCM(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-CCM"))
 #define IS_MODE_GCM(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-GCM"))
+#define IS_MODE_EAX(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-EAX"))
+#define IS_MODE_OCB(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-OCB"))
 
 #define IS_OP_DECRYPT(ctx) (ctx->mode == DECRYPT)
 
@@ -89,6 +91,13 @@ void cipher_init(cipher_context * ctx, byte in_buf[], int in_len, unsigned char 
         ERR_print_errors_fp(stderr);
     }
     EVP_CIPHER_CTX_set_padding(ctx->context, ctx->padding);
+}
+
+void cipher_update_aad(cipher_context *ctx, int *out_len_ptr, byte aad_buf[], int aad_len) {
+    // Just ignore if the algorithm does not support AAD ?
+    if (IS_MODE_CCM(ctx) || IS_MODE_GCM(ctx) || IS_MODE_EAX(ctx) || IS_MODE_OCB(ctx)) {
+        cipher_update(ctx, NULL, out_len_ptr, aad_buf, aad_len);
+    }
 }
 
 void cipher_update(cipher_context *ctx, byte out_buf[], int *out_len_ptr, byte in_buf[], int in_len) {

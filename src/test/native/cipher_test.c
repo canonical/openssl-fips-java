@@ -53,6 +53,7 @@ static int array_equals(byte a1[], int l1, byte a2[], int l2) {
 int test_round_trip(OSSL_LIB_CTX *libctx, const char *cipher_type, const char *padding_name) {
     unsigned char key[] = {0x5a, 0x33, 0x98, 0x0e, 0x71, 0xe7, 0xd6, 0x7f, 0xd6, 0xcf, 0x17, 0x14, 0x54, 0xdc, 0x96, 0xe5};
     unsigned char iv[] =  {0x33, 0xae, 0x68, 0xeb, 0xb8, 0x01, 0x0c, 0x6b, 0x3d, 0xa6, 0xb9, 0xcb, 0x29, 0x3a, 0x4d, 0x34};
+    unsigned char aad[] = {0x12, 0x31, 0x99, 0x71, 0x82, 0x88, 0x27, 0x2a, 0x9b, 0xad, 0xc4, 0x95, 0x7f, 0x6d, 0x11, 0x30};
 
     byte encrypted_output[1024], decrypted_output[1024];
     int enc_out_len = 0, dec_out_len = 0, tmplen = 0; 
@@ -65,6 +66,7 @@ int test_round_trip(OSSL_LIB_CTX *libctx, const char *cipher_type, const char *p
 
     int total_enc_out_len = 0;
     cipher_init(context, input, INPUT_SIZE, key, iv, 16, ENCRYPT);
+    cipher_update_aad(context, &enc_out_len, aad, 16);
     cipher_update(context, encrypted_output, &enc_out_len, input, INPUT_SIZE);
     total_enc_out_len += enc_out_len;
     cipher_update(context, encrypted_output + total_enc_out_len, &enc_out_len, input, INPUT_SIZE);
@@ -75,6 +77,7 @@ int test_round_trip(OSSL_LIB_CTX *libctx, const char *cipher_type, const char *p
     //print_byte_array(encrypted_output, total_enc_out_len);
     tmplen = 0;
     cipher_init(context, encrypted_output, enc_out_len, key, iv, 16, DECRYPT);
+    cipher_update_aad(context, &dec_out_len, aad, 16);
     cipher_update(context, decrypted_output, &dec_out_len, encrypted_output, total_enc_out_len);
     cipher_do_final(context, decrypted_output + dec_out_len, &tmplen);
     dec_out_len += tmplen;

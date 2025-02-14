@@ -35,6 +35,8 @@ cipher_context* create_cipher_context(OSSL_LIB_CTX *libctx, const char *name, co
 
 void cipher_init(cipher_context * ctx, byte in[], int in_len, unsigned char *key, unsigned char *iv, int iv_len, int mode);
 
+void cipher_update_aad(cipher_context *ctx, int *out_len_ptr, byte aad[], int aad_len);
+
 void cipher_update(cipher_context *ctx, byte out[], int *out_len_ptr, byte in[], int in_len);
 
 void cipher_do_final(cipher_context *ctx, byte *out, int *out_len_ptr);
