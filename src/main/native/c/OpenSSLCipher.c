@@ -89,6 +89,19 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_cipher_OpenSSLCipher_doF
     return ret_array;
 }
 
+JNIEXPORT void JNICALL Java_com_canonical_openssl_cipher_OpenSSLCipher_updateAAD0
+    (JNIEnv *env, jobject this, jbyteArray aad, jint offset, jint length) {
+    jclass clazz = (*env)->GetObjectClass(env, this);
+    jfieldID ctx_id = (*env)->GetFieldID(env, clazz, "cipherContext", "J");
+    jlong ctx_handle = (*env)->GetLongField(env, this, ctx_id);
+
+    jbyte *aad_bytes = (jbyte *)malloc(length);
+    (*env)->GetByteArrayRegion(env, aad, offset, length, aad_bytes);
+
+    int len;
+    cipher_update_aad((cipher_context*)ctx_handle, &len, aad_bytes, length);
+}
+
 JNIEXPORT void JNICALL Java_com_canonical_openssl_cipher_OpenSSLCipher_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
     free_cipher((cipher_context*) handle);

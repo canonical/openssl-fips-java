@@ -63,6 +63,14 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_cipher_OpenSSLCipher_doU
 JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_cipher_OpenSSLCipher_doFinal0
   (JNIEnv *, jobject, jbyteArray, jint);
 
+/*
+ * Class:     com_canonical_openssl_cipher_OpenSSLCipher
+ * Method:    updateAAD0
+ * Signature: ([BII)V
+ */
+JNIEXPORT void JNICALL Java_com_canonical_openssl_cipher_OpenSSLCipher_updateAAD0
+    (JNIEnv *env, jobject this, jbyteArray aad, jint offset, jint length);
+
 #ifdef __cplusplus
 }
 #endif

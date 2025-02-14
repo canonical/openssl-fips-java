@@ -19,6 +19,10 @@
 #include <stdio.h>
 
 #define IS_MODE_CCM(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-CCM"))
+#define IS_MODE_GCM(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-GCM"))
+#define IS_MODE_EAX(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-EAX"))
+#define IS_MODE_OCB(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-OCB"))
+
 #define IS_OP_DECRYPT(ctx) (ctx->mode == DECRYPT)
 
 #define MAX_CIPHER_TABLE_SIZE 256
@@ -72,6 +76,7 @@ cipher_context* create_cipher_context(OSSL_LIB_CTX *libctx, const char *name, co
         return NULL;
     }
     new_context->padding = get_padding_code(padding_name);
+    memset(new_context->gcm_tag, 0, GCM_TAG_LEN);
     return new_context;
 }
 
@@ -88,6 +93,13 @@ void cipher_init(cipher_context * ctx, byte in_buf[], int in_len, unsigned char 
     EVP_CIPHER_CTX_set_padding(ctx->context, ctx->padding);
 }
 
+void cipher_update_aad(cipher_context *ctx, int *out_len_ptr, byte aad_buf[], int aad_len) {
+    // Just ignore if the algorithm does not support AAD ?
+    if (IS_MODE_CCM(ctx) || IS_MODE_GCM(ctx) || IS_MODE_EAX(ctx) || IS_MODE_OCB(ctx)) {
+        cipher_update(ctx, NULL, out_len_ptr, aad_buf, aad_len);
+    }
+}
+
 void cipher_update(cipher_context *ctx, byte out_buf[], int *out_len_ptr, byte in_buf[], int in_len) {
     if (IS_MODE_CCM(ctx)) {
         EVP_CipherUpdate(ctx->context, NULL, out_len_ptr, NULL, IS_OP_DECRYPT(ctx) ? in_len-TAG_LEN : in_len);
@@ -100,13 +112,21 @@ void cipher_update(cipher_context *ctx, byte out_buf[], int *out_len_ptr, byte i
 }
 
 void cipher_do_final(cipher_context *ctx, byte *out_buf, int *out_len_ptr) {
+    if (ctx->mode == DECRYPT && IS_MODE_GCM(ctx)) {
+        EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_GCM_SET_TAG, TAG_LEN, ctx->gcm_tag);
+    }
+
     if (!EVP_CipherFinal_ex(ctx->context, out_buf, out_len_ptr)) {
         ERR_print_errors_fp(stderr);
     }
 
-    if (ctx->mode == ENCRYPT && IS_MODE_CCM(ctx)) {
-        *out_len_ptr = TAG_LEN;
-        EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_GET_TAG, TAG_LEN, out_buf);
+    if (ctx->mode == ENCRYPT) {
+        if(IS_MODE_CCM(ctx)) {
+            *out_len_ptr = TAG_LEN;
+            EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_GET_TAG, TAG_LEN, out_buf);
+        } else if(IS_MODE_GCM(ctx)) {
+            EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_GCM_GET_TAG, TAG_LEN, ctx->gcm_tag);
+        }
     }
 }
 

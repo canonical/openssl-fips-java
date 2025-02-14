@@ -107,6 +107,8 @@ public class CipherTest {
         String cipherName = nameKeySizeAndMode + "/" + padding;
         SecureRandom sr = SecureRandom.getInstance("NativePRNG");
 
+        String aad = "The quick brown fox jumps over the lazy dog";
+
         byte[] key;
         String keySize = nameKeySizeAndMode.split("/")[0].substring(3);
         if (keySize.equals("128")) {
@@ -138,7 +140,12 @@ public class CipherTest {
 
         byte[] fullEnc = new byte[128];
         int encLen = 0;
- 
+
+        // Add Additional Authentication Data
+        if (nameKeySizeAndMode.endsWith("CCM") || nameKeySizeAndMode.endsWith("GCM")) {
+            cipher.updateAAD(aad.getBytes(), 0, aad.length());
+        }
+
         byte[] enc1 = cipher.update(input, 0, input.length);
         System.arraycopy(enc1, 0, fullEnc, 0, enc1.length);
         encLen += enc1.length;
@@ -149,6 +156,12 @@ public class CipherTest {
 
         Cipher decipher = Cipher.getInstance(nameKeySizeAndMode + "/" + padding, "OpenSSLFIPSProvider");
         decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
+
+        // Add Additional Authentication Data
+        if (nameKeySizeAndMode.endsWith("CCM") || nameKeySizeAndMode.endsWith("GCM")) {
+            decipher.updateAAD(aad.getBytes(), 0, aad.length());
+        }
+
         byte[] output = decipher.doFinal(fullEnc, 0, encLen);
 
         assertArrayEquals("Multi-update cipher test for " + cipherName + " failed", fullInput, output); 
@@ -158,6 +171,8 @@ public class CipherTest {
         SecureRandom sr = SecureRandom.getInstance("NativePRNG");
         String cipherName = nameKeySizeAndMode + "/" + padding;
         Cipher cipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+
+        String aad = "The quick brown fox jumps over the lazy dog";
 
         byte[] key;
         String keySize = nameKeySizeAndMode.split("/")[0].substring(3);
@@ -183,10 +198,21 @@ public class CipherTest {
         byte[] input = new byte[16];
         sr.nextBytes(input);
 
+        // Add Additional Authentication Data
+        if (nameKeySizeAndMode.endsWith("CCM") || nameKeySizeAndMode.endsWith("GCM")) {
+            cipher.updateAAD(aad.getBytes(), 0, aad.length());
+        }
+
         byte[] outFinal = cipher.doFinal(input, 0, input.length);
 
         Cipher decipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
         decipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
+
+        // Add Additional Authentication Data
+        if (nameKeySizeAndMode.endsWith("CCM") || nameKeySizeAndMode.endsWith("GCM")) {
+            decipher.updateAAD(aad.getBytes(), 0, aad.length());
+        }
+
         byte[] output = decipher.doFinal(outFinal, 0, outFinal.length);
 
         assertArrayEquals("Single update cipher test for " + cipherName + " failed",  input, output);
