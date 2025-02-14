@@ -30,6 +30,12 @@ import java.security.SecureRandom;
 import javax.crypto.ShortBufferException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.BadPaddingException;
+import java.security.InvalidKeyException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.SecretKeyFactory;
 
 /* This implementation will be exercised by the user through the
  * javax.crypto.Cipher API which isn't marked thread-safe.
@@ -104,12 +110,12 @@ abstract public class OpenSSLCipher extends CipherSpi {
 
     @Override
     protected void engineInit(int opmode, Key key, AlgorithmParameterSpec params, SecureRandom random) {
-       if (opmode != Cipher.ENCRYPT_MODE && opmode != Cipher.DECRYPT_MODE && !(params instanceof IvParameterSpec)) {
+        if (!(params instanceof IvParameterSpec)) {
             throw new UnsupportedOperationException ("The prototype supports only symmetric-key encrypt/decrypt with an IV");
         }
         this.firstUpdate = true;
         this.inputSize = this.outputSize = 0;
-        this.opmode = (opmode == Cipher.ENCRYPT_MODE ? ENCRYPT : DECRYPT);
+        this.opmode = ((opmode == Cipher.ENCRYPT_MODE || opmode == Cipher.WRAP_MODE)? ENCRYPT : DECRYPT);
         this.keyBytes = key.getEncoded();
         this.iv = ((IvParameterSpec)params).getIV(); 
         if (!isModeCCM()) {
@@ -192,6 +198,45 @@ abstract public class OpenSSLCipher extends CipherSpi {
     protected void engineUpdateAAD(ByteBuffer src) {
         byte[] aad = src.array();
         updateAAD0(aad, 0, aad.length);
+    }
+
+    @Override
+    protected byte[] engineWrap(Key key) throws IllegalBlockSizeException, InvalidKeyException {
+        byte[] encoded = key.getEncoded();
+        if ((encoded == null) || (encoded.length == 0)) {
+            throw new InvalidKeyException("Could not obtain encoded key");
+        }
+
+        try {
+            return engineDoFinal(encoded, 0, encoded.length);
+        } catch (BadPaddingException e) {
+            throw new InvalidKeyException("Wrapping failed", e);
+        }
+    }
+
+    @Override
+    protected Key engineUnwrap(byte[] wrappedKey, String wrappedKeyAlgorithm, int wrappedKeyType)
+                    throws InvalidKeyException, NoSuchAlgorithmException {
+
+        if (wrappedKeyType == Cipher.PUBLIC_KEY || wrappedKeyType == Cipher.PRIVATE_KEY) {
+            throw new UnsupportedOperationException("No KeyFactory for public/private key pairs in the provider yet");
+        }
+
+        byte[] keyMaterial = null;
+
+        try {
+            keyMaterial = engineDoFinal(wrappedKey, 0, wrappedKey.length);
+        } catch (BadPaddingException | IllegalBlockSizeException e) {
+            throw new InvalidKeyException("Unwrapping failed", e);
+        }
+
+        return createKey(keyMaterial, wrappedKeyAlgorithm, wrappedKeyType);
+    }
+
+    // TODO: might need to move to its own helper class
+    private Key createKey(byte[] keyMaterial, String algo, int keyType) throws NoSuchAlgorithmException {
+        // TODO: keyType is only SECRET_KEY for now
+        return new SecretKeySpec(keyMaterial, 0, keyMaterial.length, algo);
     }
 
     private static void cleanupNativeMemory(long handle) {

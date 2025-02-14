@@ -29,6 +29,8 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.security.spec.AlgorithmParameterSpec;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
 import org.junit.Test;
@@ -339,5 +341,67 @@ public class CipherTest {
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
         byte[] retIV = cipher.getIV();
         assertArrayEquals("Returned IV does not match supplied IV", iv, retIV);
+    }
+
+    @Test
+    public void testKeyWrapUnwrap() throws Exception {
+        for (String cipher : ciphers) {
+            // CCM tests currently fail
+            // see https://github.com/openssl/openssl/issues/22773
+            if (cipher.endsWith("CCM"))
+                continue;
+
+            for(String padding : paddings) {
+                runTestKeyWrapUnwrap(cipher, padding);
+            }
+        }
+    }
+    public void runTestKeyWrapUnwrap(String nameKeySizeAndMode, String padding) throws Exception {
+
+        SecureRandom sr = SecureRandom.getInstance("NativePRNG");
+        String cipherName = nameKeySizeAndMode + "/" + padding;
+
+        // create key
+        byte[] key;
+        String keySize = nameKeySizeAndMode.split("/")[0].substring(3);
+        if (keySize.equals("128")) {
+            key = new byte[16];
+        } else if (keySize.equals("192")) {
+            key = new byte[24];
+        } else if (keySize.equals("256")) {
+            key = new byte[32];
+        } else {
+            fail("Key size unsupported");
+            return;
+        }
+
+        sr.nextBytes(key);
+        Key wrappingKey = new SecretKeySpec(key, "AES");
+
+        byte[] iv = new byte[16];
+        sr.nextBytes(iv);
+        AlgorithmParameterSpec spec = new IvParameterSpec(iv);
+
+        // create secret key to wrap/unwrap
+        byte[] testKey = new byte[16];
+        sr.nextBytes(testKey);
+        SecretKeySpec sk1 = new SecretKeySpec(testKey, 0, 16, "AES");
+
+
+        // init cipher for key wrapping
+        Cipher cipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+        cipher.init(Cipher.WRAP_MODE, wrappingKey, spec, sr);
+
+        // wrap
+        byte[] wrappedKey = cipher.wrap(sk1);
+
+        // init cipher for key wrapping
+        Cipher decipher = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+        decipher.init(Cipher.UNWRAP_MODE, wrappingKey, spec, sr);
+
+        // unwrap
+        Key sk2 = decipher.unwrap(wrappedKey, "AES", Cipher.SECRET_KEY);
+
+        assertArrayEquals("Invalid secret key " + (nameKeySizeAndMode + "/" +  padding), sk1.getEncoded(), sk2.getEncoded());
     }
 }
