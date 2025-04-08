@@ -25,34 +25,34 @@ In each of the three cases above, the OpenSSLFIPSProvider must be present on the
 The Java OpenSSLFIPSProvider supports a subset of the algorithms and operations supported by the underlying OpenSSL's [OSSL_PROVIDER_FIPS](https://docs.openssl.org/3.0/man7/OSSL_PROVIDER-FIPS/#description) module. They are listed below in Java-security parlance.
 
 #### Deterministic Random Bit Generators
-| Algorithm name| Algorithm reference in OpenSSL | Description |
+| Algorithm name| Algorithm reference in OpenSSL| Other info |
 |----------------|------------------------------------|------------|
-|AES256CTR|[EVP_RAND-CTR-DRBG](https://docs.openssl.org/3.0/man7/EVP_RAND-CTR-DRBG/)| |
-|HashSHA512|[EVP_RAND-HASH-DRBG](https://docs.openssl.org/3.0/man7/EVP_RAND-HASH-DRBG/)||
-|HMACSHA256|[EVP_RAND-HMAC-DRBG](https://docs.openssl.org/3.0/man7/EVP_RAND-HMAC-DRBG/)||
+|AES256CTR|[EVP_RAND-CTR-DRBG](https://docs.openssl.org/3.0/man7/EVP_RAND-CTR-DRBG/)| Conforms to NIST SP 800-90A and SP 800-90B |
+|HashSHA512|[EVP_RAND-HASH-DRBG](https://docs.openssl.org/3.0/man7/EVP_RAND-HASH-DRBG/)| Conforms to NIST SP 800-90A and SP 800-90B |
+|HMACSHA256|[EVP_RAND-HMAC-DRBG](https://docs.openssl.org/3.0/man7/EVP_RAND-HMAC-DRBG/)| Conforms to NIST SP 800-90A and SP 800-90B |
 
 #### Symmetric Ciphers
-| Algorithm name| Algorithm reference in OpenSSL EVP | Description |
+| Algorithm name| Algorithm reference in OpenSSL| Other info |
 |----------------|------------------------------------|------------|
-| AES[key-size]/[mode]/[padding] * | [EVP_CIPHER-AES](https://docs.openssl.org/3.0/man7/EVP_CIPHER-AES/) | |
+| AES[key-size]/[mode]/[padding] * | [EVP_CIPHER-AES](https://docs.openssl.org/3.0/man7/EVP_CIPHER-AES/) |  |
 * The supported key-sizes are 128, 192 and 256.
 * The supported modes are `ECB`, `CBC`, `CFB1`, `CFB8`, `CTR`, `CCM` and `GCM`.
 * The support paddings are `NONE`, `PKCS7`, `PKCS5`, `ISO10126_2`, `ISO7816_4`, `X9_23`
 * Examples of valid algorithm names: `AES256/CBC/NONE` and `AES128/CTR/PKCS5`
 
 #### Key Agreement
-| Algorithm name| Algorithm reference in OpenSSL EVP | Description |
+| Algorithm name| Algorithm reference in OpenSSL | Other info |
 |----------------|------------------------------------|------------|
 | DH | [EVP_KEYEXCH-DH](https://docs.openssl.org/3.0/man7/EVP_KEYEXCH-DH/)| Diffie-Hellman |
 | ECDH | [EVP_KEYEXCH-ECDH](https://docs.openssl.org/3.0/man7/EVP_KEYEXCH-ECDH/) | Elliptic-Curve Diffie Hellman |
 
 #### Key Encapsulation
-| Algorithm name| Algorithm reference in OpenSSL EVP | Description |
+| Algorithm name| Algorithm reference in OpenSSL | Other info |
 |----------------|------------------------------------|------------|
-| RSA | [EVP_KEM-RSA](https://docs.openssl.org/3.0/man7/EVP_KEM-RSA/)||
+| RSA | [EVP_KEM-RSA](https://docs.openssl.org/3.0/man7/EVP_KEM-RSA/)| Conforms with SP800-56Br2 |
 
 #### Message Authentication Code
-| Algorithm name| Algorithm reference in OpenSSL EVP | Description |
+| Algorithm name| Algorithm reference in OpenSSL | Other info |
 |----------------|------------------------------------|------------|
 |CMACwithAes256CBC|[EVP_MAC-CMAC](https://docs.openssl.org/3.0/man7/EVP_MAC-CMAC/)||
 |GMACWithAes128GCM|[EVP_MAC-GMAC](https://docs.openssl.org/3.0/man7/EVP_MAC-GMAC/)||
@@ -62,25 +62,25 @@ The Java OpenSSLFIPSProvider supports a subset of the algorithms and operations 
 |KMAC256|[EVP_MAC-KMAC](https://docs.openssl.org/3.0/man7/EVP_MAC-KMAC/)||
 
 #### Message Digests
-| Algorithm name| Algorithm reference in OpenSSL EVP | Description |
+| Algorithm name| Algorithm reference in OpenSSL| Other info |
 |----------------|------------------------------------|------------|
-|MDKeccakKemak128|||
-|MDKeccakKemak256|||
-|MDSHA1|||
-|MDSHA224|||
-|MDSHA256|||
-|MDSHA384|||
-|MDSHA3_224|||
-|MDSHA3_256|||
-|MDSHA3_384|||
-|MDSHA3_512|||
+|MDKeccakKemak128|[EVP_MD-SHAKE](https://docs.openssl.org/3.0/man7/EVP_MD-SHAKE/)| Described in Appendix A of NIST SP 800-185|
+|MDKeccakKemak256|[EVP_MD-SHAKE](https://docs.openssl.org/3.0/man7/EVP_MD-SHAKE/)| Described in Appendix A of NIST SP 800-185|
+|MDSHA1|[EVP_MD-SHA1](https://docs.openssl.org/3.0/man7/EVP_MD-SHA1/)||
+|MDSHA224|[EVP_MD-SHA2](https://docs.openssl.org/3.0/man7/EVP_MD-SHA2/)||
+|MDSHA256|[EVP_MD-SHA2](https://docs.openssl.org/3.0/man7/EVP_MD-SHA2/)||
+|MDSHA384|[EVP_MD-SHA2](https://docs.openssl.org/3.0/man7/EVP_MD-SHA2/)||
+|MDSHA3_224|[EVP_MD-SHA3](https://docs.openssl.org/3.0/man7/EVP_MD-SHA3/)||
+|MDSHA3_256|[EVP_MD-SHA3](https://docs.openssl.org/3.0/man7/EVP_MD-SHA3/)||
+|MDSHA3_384|[EVP_MD-SHA3](https://docs.openssl.org/3.0/man7/EVP_MD-SHA3/)||
+|MDSHA3_512|[EVP_MD-SHA3](https://docs.openssl.org/3.0/man7/EVP_MD-SHA3/)||
 
 #### Key Definition Functions
-| Algorithm name| Algorithm reference in OpenSSL EVP | Description |
-|----------------|------------------------------------|------------|
-|PBKDF2|[EVP_KDF-PBKDF2](https://docs.openssl.org/3.0/man7/EVP_KDF-PBKDF2/)||
+| Algorithm name| Algorithm reference in OpenSSL| Other info |
+|----------------|------------------------------------|-----------|
+|PBKDF2|[EVP_KDF-PBKDF2](https://docs.openssl.org/3.0/man7/EVP_KDF-PBKDF2/)| Password-based Key Derivation Function|
 
 #### Digital Signatures
-| Algorithm name| Algorithm reference in OpenSSL EVP | Description |
+| Algorithm name| Algorithm reference in OpenSSL| Other info |
 |----------------|------------------------------------|------------|
-|RSAwithSHA256|[EVP_SIGNATURE-RSA](https://docs.openssl.org/3.0/man7/EVP_SIGNATURE-RSA/)||
+|RSAwithSHA256|[EVP_SIGNATURE-RSA](https://docs.openssl.org/3.0/man7/EVP_SIGNATURE-RSA/)| Asymmetric signatures using RSA key pair, SHA-256 used as digest|
