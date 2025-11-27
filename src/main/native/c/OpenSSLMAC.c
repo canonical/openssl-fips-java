@@ -30,17 +30,11 @@
  */
 JNIEXPORT jlong JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doInit0
     (JNIEnv *env, jobject this, jstring name, jstring cipher, jstring digest, jbyteArray iv, jint output_length, jbyteArray key) {
-    char *cipher_str = jstring_to_char_array(env, cipher);
-    char *digest_str = jstring_to_char_array(env, digest);
-    mac_params *params = init_mac_params(cipher_str,
-                                        digest_str,
+    mac_params *params = init_mac_params(jstring_to_char_array(env, cipher),
+                                        jstring_to_char_array(env, digest),
                                         jbyteArray_to_byte_array(env, iv), array_length(env, iv),
                                         (size_t)output_length);
-    release_jstring(env, cipher, cipher_str);
-    release_jstring(env, digest, digest_str);
-    char *name_str = jstring_to_char_array(env, name);
-    mac_context *ctx = mac_init(name_str, jbyteArray_to_byte_array(env, key), array_length(env, key), params);
-    release_jstring(env, name, name_str);
+    mac_context *ctx = mac_init(jstring_to_char_array(env, name), jbyteArray_to_byte_array(env, key), array_length(env, key), params);
     return (jlong)ctx;                              
 }
 
