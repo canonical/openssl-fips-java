@@ -28,7 +28,10 @@ extern OSSL_LIB_CTX *global_libctx;
  */
 JNIEXPORT jlong JNICALL Java_com_canonical_openssl_md_OpenSSLMD_doInit0
   (JNIEnv *env, jobject this, jstring algorithm) {
-    return (jlong) md_init(global_libctx, (const char*)jstring_to_char_array(env, algorithm));
+    char *algorithm_str = jstring_to_char_array(env, algorithm);
+    jlong result = (jlong) md_init(global_libctx, (const char*)algorithm_str);
+    release_jstring(env, algorithm, algorithm_str);
+    return result;
 }
 
 /*

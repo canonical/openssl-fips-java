@@ -29,7 +29,10 @@ sv_params *create_params(JNIEnv *env, jobject this, jobject params) {
    jstring mgf1_digest = get_string_field(env, params, "mgf1Digest");
    char *mgf1_digest_name = jstring_to_char_array(env, mgf1_digest);
    int padding = get_int_field(env, params, "padding"); 
-   return sv_create_params(global_libctx, salt_length, padding == 0 ? NONE : PSS, digest_name, mgf1_digest_name);
+   sv_params *result = sv_create_params(global_libctx, salt_length, padding == 0 ? NONE : PSS, digest_name, mgf1_digest_name);
+   release_jstring(env, digest, digest_name);
+   release_jstring(env, mgf1_digest, mgf1_digest_name);
+   return result;
 }
 
 sv_type svtype_from_str(char *str) {
@@ -43,7 +46,9 @@ jlong init_signature(JNIEnv *env, jobject this, jstring sig_name, jobject jkey, 
     sv_params *svparams = create_params(env, this, params);
     EVP_PKEY* evpkey = CASTPTR(EVP_PKEY, invokeLongMethod(env, jkey, "getNativeKeyHandle", "()J"));
     sv_key *key = sv_init_key(global_libctx, evpkey);
-    sv_type type = svtype_from_str(jstring_to_char_array(env, sig_name));
+    char *sig_name_str = jstring_to_char_array(env, sig_name);
+    sv_type type = svtype_from_str(sig_name_str);
+    release_jstring(env, sig_name, sig_name_str);
     sv_context *svc = sv_init(global_libctx, key, svparams, state, type);
     free_sv_params(svparams);
     free_sv_key(key);
