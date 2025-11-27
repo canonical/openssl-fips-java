@@ -34,23 +34,28 @@ public class NativeLibraryLoader {
 
         try {
             InputStream in = NativeLibraryLoader.class.getResourceAsStream(location + libFileName);
+            if (in == null) {
+                throw new IOException("Native library not found in resources: " + location + libFileName);
+            }
 
-            File tempFile = Files.createFile(Paths.get("/tmp/" + libFileName)).toFile();
+            File tempFile = Files.createTempFile("libjssl-", ".so").toFile();
+            tempFile.deleteOnExit();
 
             try (FileOutputStream out = new FileOutputStream(tempFile)) {
-                byte[] buffer = new byte[1024];
+                byte[] buffer = new byte[8192];
                 int bytesRead;
                 while ((bytesRead = in.read(buffer)) != -1) {
                     out.write(buffer, 0, bytesRead);
                 }
+            } finally {
+                in.close();
             }
 
             System.load(tempFile.getAbsolutePath());
             loaded = true;
 
-            tempFile.delete();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to load native libary " + libFileName + ": " + e);
+            throw new RuntimeException("Failed to load native library " + libFileName + ": " + e.getMessage(), e);
         }
     }
 }
