@@ -2,3 +2,4 @@ build
 target
 *.class
 **/AES*.java
+hs_err_pid*.log

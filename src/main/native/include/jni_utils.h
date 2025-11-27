@@ -37,6 +37,8 @@ jbyteArray new_byteArray(JNIEnv *env, byte *source, int length);
 
 char* jstring_to_char_array(JNIEnv *env, jstring string);
 
+void release_jstring(JNIEnv *env, jstring string, const char *chars);
+
 char *jcharArray_to_char_array(JNIEnv *env, jcharArray chars);
 
 jlong invokeLongMethod(JNIEnv *env, jobject this, const char *name, const char *signature);

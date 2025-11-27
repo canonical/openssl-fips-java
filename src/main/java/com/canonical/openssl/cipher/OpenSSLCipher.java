@@ -81,7 +81,7 @@ abstract public class OpenSSLCipher extends CipherSpi {
     private Cleaner.Cleanable cleanable;
 
     protected OpenSSLCipher(String nameKeySizeAndMode, String padding) {
-        this.name = name;
+        this.name = nameKeySizeAndMode;
         this.mode = nameKeySizeAndMode.split("-")[2];
         this.padding = padding;
         this.cipherContext = createContext0(nameKeySizeAndMode, padding);
@@ -99,7 +99,7 @@ abstract public class OpenSSLCipher extends CipherSpi {
 
     @Override
     protected void engineInit(int opmode, Key key, AlgorithmParameters params, SecureRandom random) {
-        System.err.println("AlgorithmParameters will be ignored by the prototype");
+        // Note: AlgorithmParameters support not yet implemented
         engineInit(opmode, key, random);
     }
 

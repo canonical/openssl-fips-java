@@ -57,11 +57,11 @@ OSSL_LIB_CTX* load_openssl_provider(const char *name, const char* conf_file_path
 }
 
 OSSL_LIB_CTX* load_openssl_fips_provider(const char* conf_file_path) {
-    load_openssl_provider("fips", conf_file_path);
+    return load_openssl_provider("fips", conf_file_path);
 }
 
 OSSL_LIB_CTX* load_openssl_base_provider(const char* conf_file_path) {
-    load_openssl_provider("base", conf_file_path);
+    return load_openssl_provider("base", conf_file_path);
 }
 
 int JNI_OnLoad(JavaVM* vm, void *reserved) {

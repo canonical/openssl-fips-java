@@ -18,11 +18,16 @@
 #include "jssl.h"
 
 char *jstring_to_char_array(JNIEnv *env, jstring string) {
-    // TODO: free this
     if (string == NULL) {
         return NULL;
     }
     return (char*)(*env)->GetStringUTFChars(env, string, 0);
+}
+
+void release_jstring(JNIEnv *env, jstring string, const char *chars) {
+    if (string != NULL && chars != NULL) {
+        (*env)->ReleaseStringUTFChars(env, string, chars);
+    }
 }
 
 byte *jbyteArray_to_byte_array(JNIEnv *env, jbyteArray bytes) {
