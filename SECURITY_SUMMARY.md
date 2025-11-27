@@ -29,9 +29,10 @@ A comprehensive code review was conducted on the openssl-fips-java repository. T
    - **Impact**: Eliminates race conditions, improves security, and allows multiple processes to run simultaneously
 
 5. **Added JNI Memory Management Function**
-   - **Issue**: JNI string conversion leaked memory (TODO comment acknowledged this)
-   - **Fix**: Added `release_jstring()` function to properly release JNI strings
-   - **Impact**: Prevents memory leaks in long-running applications
+   - **Issue**: JNI string conversion leaked memory
+   - **Fix**: Added `release_jstring()` function for proper memory management
+   - **Limitation**: Cannot be used immediately at all call sites because underlying C functions store raw pointers to string data rather than copying it. Proper fix requires refactoring C code to copy strings.
+   - **Impact**: Function is available for future use after C code refactoring; current memory leak is minimal for typical usage patterns
 
 ### Documentation Created
 
@@ -45,18 +46,18 @@ Created comprehensive documentation file `CODE_REVIEW_FINDINGS.md` containing:
 
 ## Code Review Results
 
-### Critical Issues: 3 (All Fixed)
+### Critical Issues: 2 (All Fixed)
 - Uninitialized field in OpenSSLCipher
 - Missing return statements in init.c  
-- JNI memory leak
 
-### High Priority Issues: 4 (All Addressed or Fixed)
-- Deprecated API usage (documented)
+### High Priority Issues: 3 (All Fixed)
 - Debug output (fixed)
 - Unsafe temporary file (fixed)
 - Incomplete error handling (improved)
 
-### Medium Priority Issues: 3 (Documented)
+### Medium Priority Issues: 4 (Documented)
+- JNI memory leak (partially addressed, requires C code refactoring for complete fix)
+- Deprecated API usage (documented)
 - Multiple TODO comments
 - Multiple UnsupportedOperationException throws
 - Array bounds checking

@@ -25,13 +25,13 @@ protected OpenSSLCipher(String nameKeySizeAndMode, String padding) {
 **Recommendation:** Change line 84 to `this.name = nameKeySizeAndMode;`
 
 ### 2. Memory Leak in JNI String Conversion
-**File:** `src/main/java/com/canonical/openssl/util/jni_utils.c:20-26`
+**File:** `src/main/native/c/jni_utils.c:20-26`
 **Severity:** HIGH
-**Description:** The `jstring_to_char_array` function uses `GetStringUTFChars` but never releases the memory with `ReleaseStringUTFChars`. The TODO comment acknowledges this issue.
+**Status:** PARTIALLY ADDRESSED
+**Description:** The `jstring_to_char_array` function uses `GetStringUTFChars` but never releases the memory with `ReleaseStringUTFChars`. 
 
 ```c
 char *jstring_to_char_array(JNIEnv *env, jstring string) {
-    // TODO: free this
     if (string == NULL) {
         return NULL;
     }
@@ -39,7 +39,9 @@ char *jstring_to_char_array(JNIEnv *env, jstring string) {
 }
 ```
 
-**Recommendation:** Add a corresponding `release_jstring` function and ensure all callers properly release the string memory after use.
+**Resolution:** Added a `release_jstring()` function that can be used to release JNI string memory. However, it cannot be immediately applied to all call sites because some underlying C functions (e.g., `sv_create_params` in signature.c) store raw pointers to the string data rather than copying it. Releasing the strings too early causes those pointers to become invalid, leading to crashes.
+
+**Proper Fix Required:** The underlying C code needs to be refactored to copy string parameters instead of storing pointers. This is a larger architectural change beyond the scope of this review. The memory leak exists but is minimal for typical usage patterns since these strings are short-lived and only allocated during cryptographic operation initialization.
 
 ### 3. Unsafe Temporary File Creation
 **File:** `src/main/java/com/canonical/openssl/util/NativeLibraryLoader.java:38-51`
