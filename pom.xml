@@ -73,7 +73,7 @@
                 <!-- Plugin to help run make commands -->
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.6.2</version>
                 <executions>
                     <execution>
                         <id>generate-sources</id>
