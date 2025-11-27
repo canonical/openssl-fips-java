@@ -38,7 +38,6 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doInit0
                                         (size_t)output_length);
     release_jstring(env, cipher, cipher_str);
     release_jstring(env, digest, digest_str);
-    
     char *name_str = jstring_to_char_array(env, name);
     mac_context *ctx = mac_init(name_str, jbyteArray_to_byte_array(env, key), array_length(env, key), params);
     release_jstring(env, name, name_str);
