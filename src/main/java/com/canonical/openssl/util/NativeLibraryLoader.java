@@ -40,6 +40,9 @@ public class NativeLibraryLoader {
             // Files.createTempFile() requires SecureRandom which may not be available yet
             // when this provider is loaded in a FIPS-compliant JDK, causing NPE
             String tempDir = System.getProperty("java.io.tmpdir");
+            if (tempDir == null || tempDir.isEmpty()) {
+                tempDir = "/tmp"; // Fallback to /tmp on Unix-like systems
+            }
             String uniqueSuffix = System.currentTimeMillis() + "-" + Thread.currentThread().getId();
             File tempFile = new File(tempDir, "libjssl-" + uniqueSuffix + ".so");
             
@@ -58,7 +61,12 @@ public class NativeLibraryLoader {
 
             // Delete the temp file immediately after loading since it's no longer needed
             // The native library is now loaded into memory and the file is not required
-            tempFile.delete();
+            // If deletion fails (e.g., file locked on some systems), it's not critical since
+            // the file will be cleaned up by the OS eventually, and this only happens once per JVM
+            if (!tempFile.delete()) {
+                // Deletion failed, but this is not critical - log for debugging if needed
+                // The file will remain in temp directory and be cleaned up by OS temp cleanup
+            }
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to load native library " + libFileName + ": " + e.getMessage(), e);
