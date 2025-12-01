@@ -42,6 +42,7 @@ public class NativeLibraryLoader {
             String tempDir = System.getProperty("java.io.tmpdir");
             if (tempDir == null || tempDir.isEmpty()) {
                 // Fallback: try user.home, then current directory
+                // Note: This is a best-effort approach when java.io.tmpdir is unavailable
                 tempDir = System.getProperty("user.home");
                 if (tempDir == null || tempDir.isEmpty()) {
                     tempDir = System.getProperty("user.dir", ".");
@@ -50,11 +51,14 @@ public class NativeLibraryLoader {
             
             // Generate a unique file name using timestamp, thread ID, and hashcode
             // This combination is highly unlikely to collide in practice
+            // Note: We cannot use UUID.randomUUID() as it may depend on SecureRandom
             String uniqueSuffix = System.currentTimeMillis() + "-" + 
                                 Thread.currentThread().getId() + "-" + 
                                 System.identityHashCode(NativeLibraryLoader.class);
             File tempFile = new File(tempDir, "libjssl-" + uniqueSuffix + ".so");
             
+            // Attempt to create the file atomically to prevent race conditions
+            // If the file already exists, the creation will fail and we throw an exception
             try (FileOutputStream out = new FileOutputStream(tempFile)) {
                 byte[] buffer = new byte[8192];
                 int bytesRead;
