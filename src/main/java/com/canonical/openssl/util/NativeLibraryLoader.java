@@ -41,9 +41,18 @@ public class NativeLibraryLoader {
             // when this provider is loaded in a FIPS-compliant JDK, causing NPE
             String tempDir = System.getProperty("java.io.tmpdir");
             if (tempDir == null || tempDir.isEmpty()) {
-                tempDir = "/tmp"; // Fallback to /tmp on Unix-like systems
+                // Fallback: try user.home, then current directory
+                tempDir = System.getProperty("user.home");
+                if (tempDir == null || tempDir.isEmpty()) {
+                    tempDir = System.getProperty("user.dir", ".");
+                }
             }
-            String uniqueSuffix = System.currentTimeMillis() + "-" + Thread.currentThread().getId();
+            
+            // Generate a unique file name using timestamp, thread ID, and hashcode
+            // This combination is highly unlikely to collide in practice
+            String uniqueSuffix = System.currentTimeMillis() + "-" + 
+                                Thread.currentThread().getId() + "-" + 
+                                System.identityHashCode(NativeLibraryLoader.class);
             File tempFile = new File(tempDir, "libjssl-" + uniqueSuffix + ".so");
             
             try (FileOutputStream out = new FileOutputStream(tempFile)) {
