@@ -20,8 +20,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 public class NativeLibraryLoader {
     static String libFileName = "libjssl.so";
@@ -38,9 +36,13 @@ public class NativeLibraryLoader {
                 throw new IOException("Native library not found in resources: " + location + libFileName);
             }
 
-            File tempFile = Files.createTempFile("libjssl-", ".so").toFile();
-            tempFile.deleteOnExit();
-
+            // Create a unique temp file name without using Files.createTempFile()
+            // Files.createTempFile() requires SecureRandom which may not be available yet
+            // when this provider is loaded in a FIPS-compliant JDK, causing NPE
+            String tempDir = System.getProperty("java.io.tmpdir");
+            String uniqueSuffix = System.currentTimeMillis() + "-" + Thread.currentThread().getId();
+            File tempFile = new File(tempDir, "libjssl-" + uniqueSuffix + ".so");
+            
             try (FileOutputStream out = new FileOutputStream(tempFile)) {
                 byte[] buffer = new byte[8192];
                 int bytesRead;
@@ -53,6 +55,10 @@ public class NativeLibraryLoader {
 
             System.load(tempFile.getAbsolutePath());
             loaded = true;
+
+            // Delete the temp file immediately after loading since it's no longer needed
+            // The native library is now loaded into memory and the file is not required
+            tempFile.delete();
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to load native library " + libFileName + ": " + e.getMessage(), e);
