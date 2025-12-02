@@ -23,10 +23,17 @@ A comprehensive code review was conducted on the openssl-fips-java repository. T
    - **Fix**: Replaced with proper comment
    - **Impact**: Cleaner production code without debug output
 
-4. **Fixed Unsafe Temporary File Creation**
-   - **Issue**: Native library was extracted to `/tmp/libjssl.so` with hardcoded path, causing race conditions and security risks
-   - **Fix**: Changed to use `Files.createTempFile()` with unique names and `deleteOnExit()`
-   - **Impact**: Eliminates race conditions, improves security, and allows multiple processes to run simultaneously
+4. **Fixed Unsafe Temporary File Creation (Updated)**
+   - **Original Issue**: Native library was extracted to `/tmp/libjssl.so` with hardcoded path, causing race conditions and security risks
+   - **Initial Fix**: Changed to use `Files.createTempFile()` with unique names and `deleteOnExit()`
+   - **Critical Issue Discovered**: `Files.createTempFile()` depends on SecureRandom which is not available during provider initialization in FIPS-compliant JDKs, causing NullPointerException
+   - **Final Fix**: Replaced `Files.createTempFile()` with manual temp file creation using `System.currentTimeMillis()`, thread ID, and class hashcode for uniqueness
+   - **Impact**: 
+     - Eliminates the circular dependency on SecureRandom during provider initialization
+     - Prevents NPE in FIPS-compliant JDK environments
+     - Deletes temp file immediately after loading instead of using `deleteOnExit()` to prevent memory leaks
+     - Cross-platform compatible with fallback directory chain
+     - Allows the provider to be loaded successfully in FIPS mode
 
 5. **Added JNI Memory Management Function**
    - **Issue**: JNI string conversion leaked memory
