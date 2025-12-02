@@ -23,7 +23,7 @@
 
     <groupId>com.canonical.openssl</groupId>
     <artifactId>openssl-fips-java</artifactId>
-    <version>0.0.1</version>
+    <version>0.4.1</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

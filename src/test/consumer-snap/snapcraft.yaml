@@ -51,7 +51,7 @@ parts:
 
 apps:
   kem-test:
-    command: /usr/lib/jvm/java-21-openjdk-amd64/bin/java -cp $SNAP/bin/KEMTest.jar:$SNAP/imported-libs/jar/openssl-fips-java-0.0.1.jar KEMTest
+    command: /usr/lib/jvm/java-21-openjdk-amd64/bin/java -cp $SNAP/bin/KEMTest.jar:$SNAP/imported-libs/jar/openssl-fips-java-0.4.1.jar KEMTest
     environment:
       OPENSSL_MODULES: $SNAP/usr/local/lib64/ossl-modules/
       OPENSSL_CUSTOM_CONF: $SNAP/usr/local/ssl/openssl.cnf
