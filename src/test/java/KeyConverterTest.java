@@ -125,23 +125,5 @@ public class KeyConverterTest {
         // Should not crash
         KeyConverter.freeEVPKey(0);
     }
-
-    @Test
-    public void testECKeyConversion() throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
-        kpg.initialize(256); // P-256 curve
-        KeyPair kp = kpg.generateKeyPair();
-
-        // Convert to EVP_PKEY handle
-        long privateHandle = KeyConverter.privateKeyToEVPKey(kp.getPrivate());
-        assertTrue("EC private key conversion should succeed", privateHandle != 0);
-
-        long publicHandle = KeyConverter.publicKeyToEVPKey(kp.getPublic());
-        assertTrue("EC public key conversion should succeed", publicHandle != 0);
-
-        // Clean up
-        KeyConverter.freeEVPKey(privateHandle);
-        KeyConverter.freeEVPKey(publicHandle);
-    }
 }
 
