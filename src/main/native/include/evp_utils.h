@@ -19,6 +19,11 @@
 
 #define CASTPTR(TYPE, a) (TYPE *)(a)
 
+/* Legacy functions - still using d2i_* (DEPRECATED for FIPS) */
 EVP_PKEY *create_private_key(int type, byte* bytes, size_t length);
 EVP_PKEY *create_public_key(byte* bytes, size_t length);
+
+/* FIPS-safe decoder-based functions using OSSL_DECODER */
+EVP_PKEY *decode_private_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libctx);
+EVP_PKEY *decode_public_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libctx);
 
