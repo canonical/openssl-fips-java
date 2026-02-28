@@ -50,7 +50,6 @@ TEST_JAVA_DIR := ${TOPDIR}/src/test/java
 TEST_JAVA_SRCS := $(wildcard $(addsuffix /*.java, $(TEST_JAVA_DIR)))
 TEST_NAT_SRCS := $(wildcard $(addsuffix /*.c, $(TEST_JAVA_DIR)/native))
 TESTOBJS      := $(patsubst $(TEST_JAVA_DIR)/native/%.c, $(TEST_BIN)/%.o, $(TEST_NAT_SRCS))
-TESTLIB := $(BUILD)/test/bin/libsigtest.so
 
 LIBPATH := $(BUILD)/bin:${TOPDIR}/build/test/bin
 
@@ -79,9 +78,6 @@ $(BUILD)/test/bin/%.o: $(TEST_JAVA_DIR)/native/%.c
 $(SOLIB): $(OBJS)
 	@cc ${LDFLAGS} -o $@ $^ -L/usr/local/lib64 -lcrypto -lssl
 
-$(TESTLIB): $(TESTOBJS)
-	@cc -shared -fPIC -Wl,-soname,libsigtest.so -o $@ $^ -L/usr/local/lib64 -L$(BUILD)/bin -lcrypto -lssl -ljssl
-
 $(TEST_BIN)/%: $(TEST_C_DIR)/%.c
 	@cc $(TEST_CFLAGS) -o $@ $< -ljssl -lcrypto
 
@@ -90,7 +86,7 @@ gen-code:
 
 solib: $(BUILD)/bin $(SOLIB)
 
-test-solib: $(BUILD)/test/bin $(TESTLIB) $(TEST_C_OBJS)
+test-solib: $(BUILD)/test/bin $(TEST_C_OBJS)
 	@LD_LIBRARY_PATH=$(BUILD)/bin:$(BUILD)/test LIBPATH=${LIBPATH} src/test/runner.py
 
 clean:
