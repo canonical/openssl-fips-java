@@ -18,8 +18,6 @@ import java.lang.FunctionalInterface;
 import java.util.Arrays;
 import java.util.function.*;
 import javax.crypto.spec.SecretKeySpec;
-import java.security.Key;
-import java.security.spec.AlgorithmParameterSpec;
 import java.nio.ByteBuffer;
 import java.security.Security;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;

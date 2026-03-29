@@ -19,7 +19,6 @@ package com.canonical.openssl.kdf;
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.security.spec.KeySpec;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.spec.PBEKeySpec;
 import java.security.InvalidKeyException;
 import java.security.spec.InvalidKeySpecException;

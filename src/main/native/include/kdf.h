@@ -14,6 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
+#ifndef _INCLUDE_KDF_H
+#define _INCLUDE_KDF_H
 #include "jssl.h"
 
 typedef enum kdf_type { PBKDF2, HKDF } kdf_type;
@@ -53,8 +56,8 @@ typedef union {
     hkdf_params *hkdf;
 } kdf_params;
 
-void free_kdf_spec(kdf_spec *spec);
-void free_kdf_params(kdf_params *params);
+void free_kdf_spec(kdf_spec **spec);
+void free_kdf_params(kdf_params **params);
 
 kdf_params *create_hkdf_params(char *algorithm);
 kdf_spec *create_hkdf_spec(byte *salt, int saltlen, byte *info, int infolen, byte *key, int keylen);
@@ -63,3 +66,4 @@ kdf_params *create_pbkdf_params(char *algorithm);
 kdf_spec *create_pbkdf_spec(byte *password, int pass_len, byte *salt, int salt_len, unsigned int iter);
 
 int kdf_derive(OSSL_LIB_CTX *ossl_lib_ctx, kdf_spec *spec, kdf_params *params, byte *keydata, int keysize, kdf_type kdf);
+#endif //_INCLUDE_KDF_H

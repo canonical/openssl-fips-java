@@ -39,8 +39,8 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_kdf_OpenSSLPBKDF2_genera
     kdf_params *params = create_pbkdf_params("SHA-512");
 
     if (kdf_derive(global_libctx, spec, params, output, MAX_KEY_SIZE, PBKDF2) <= 0) {
-        free_kdf_spec(spec);
-        free_kdf_params(params);
+        free_kdf_spec(&spec);
+        free_kdf_params(&params);
         return NULL; 
     }
 

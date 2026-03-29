@@ -59,7 +59,7 @@ int test_round_trip(OSSL_LIB_CTX *libctx, const char *cipher_type, const char *p
     int enc_out_len = 0, dec_out_len = 0, tmplen = 0; 
  
     cipher_context *context = create_cipher_context(libctx, cipher_type, padding_name);
-    if (IS_NULL(context)) {
+    if (context == NULL) {
         printf("Null context: ");
         return 0;
     }
@@ -81,7 +81,7 @@ int test_round_trip(OSSL_LIB_CTX *libctx, const char *cipher_type, const char *p
     cipher_update(context, decrypted_output, &dec_out_len, encrypted_output, total_enc_out_len);
     cipher_do_final(context, decrypted_output + dec_out_len, &tmplen);
     dec_out_len += tmplen;
-    free_cipher(context);
+    free_cipher(&context);
     if (array_equals(decrypted_output, dec_out_len, input, INPUT_SIZE*2)) {
         return 1;
     } else {
@@ -130,7 +130,7 @@ int main(int argc, char ** argv) {
     int rc = 0;
     int idx = 0;
     const char *cipher_name = cipher_type[idx++];
-    while (!STR_EQUAL(cipher_name, "END")) {
+    while (!str_equal(cipher_name, "END")) {
         for(int j = 0; j < n_padding_types; j++) {
             if(!test_round_trip(libctx, cipher_name, padding_type[j])) {
                 printf("FAILED: test_round_trip(%s, %s)\n", cipher_name, padding_type[j]);

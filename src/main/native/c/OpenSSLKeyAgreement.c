@@ -72,7 +72,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyA
     key_agreement *agreement = (key_agreement *)get_long_field(env, this, "nativeHandle");
     shared_secret *secret = generate_shared_secret(agreement);
     jbyteArray byteArray = byte_array_to_jbyteArray(env, secret->bytes, secret->length);
-    free_shared_secret(secret);
+    free_shared_secret(&secret);
     return byteArray;
 }
 
@@ -83,5 +83,5 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyA
  */
 JNIEXPORT void JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreement_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_key_agreement((key_agreement*) handle);
+    free_key_agreement((key_agreement**) &handle);
 }

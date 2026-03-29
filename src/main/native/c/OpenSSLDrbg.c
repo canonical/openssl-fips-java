@@ -166,5 +166,5 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_drbg_OpenSSLDrbg_generat
 
 JNIEXPORT void JNICALL Java_com_canonical_openssl_drbg_OpenSSLDrbg_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_DRBG((DRBG*)handle);  
+    free_DRBG((DRBG**)&handle);
 }

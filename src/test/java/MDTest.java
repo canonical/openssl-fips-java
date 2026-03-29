@@ -15,7 +15,6 @@
  *
  */
 import java.nio.ByteBuffer;
-import java.security.DigestException;
 import java.util.Arrays;
 import java.util.function.*;
 import java.util.List;
@@ -26,8 +25,6 @@ import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
 import org.junit.Test;
 import org.junit.BeforeClass;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;

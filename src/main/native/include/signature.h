@@ -14,6 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
+#ifndef _INCLUDE_SIGNATURE_H
+#define _INCLUDE_SIGNATURE_H
 #include "jssl.h"
 #include <openssl/evp.h>
 
@@ -60,6 +63,7 @@ int sv_update(sv_context *ctx, byte *data, size_t length);
 int sv_sign(sv_context *ctx, byte *signature, size_t *signature_length);
 int sv_verify(sv_context *ctx, byte *signature, size_t sig_length);
 
-void free_sv_params(sv_params *params);
-void free_sv_key(sv_key *key);
-void free_sv_context(sv_context *context);
+void free_sv_params(sv_params **params);
+void free_sv_key(sv_key **key);
+void free_sv_context(sv_context **context);
+#endif // _INCLUDE_SIGNATURE_H

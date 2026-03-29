@@ -84,7 +84,7 @@ void test_cmac(OSSL_LIB_CTX *libctx) {
     mac_params *params = init_mac_params("AES-256-CBC", NULL, NULL, 0, 0);
     mac_context *ctx = mac_init("CMAC", key, 32, params);
     run_test(ctx);
-    free_mac_context(ctx);
+    free_mac_context(&ctx);
     free(params);
 }
 
@@ -93,7 +93,7 @@ void test_hmac_sha1(OSSL_LIB_CTX *libctx) {
     mac_params *params = init_mac_params(NULL, "SHA1", NULL, 0, 0); 
     mac_context *ctx = mac_init("HMAC", key, 64, params);
     run_test(ctx);
-    free_mac_context(ctx);
+    free_mac_context(&ctx);
     free(params);
 }
 
@@ -102,7 +102,7 @@ void test_hmac_sha3(OSSL_LIB_CTX *libctx) {
     mac_params *params = init_mac_params(NULL, "SHA3-512", NULL, 0, 0);
     mac_context *ctx = mac_init("HMAC", key, 64, params);
     run_test(ctx);
-    free_mac_context(ctx);
+    free_mac_context(&ctx);
     free(params);
 }
 
@@ -111,7 +111,7 @@ void test_gmac(OSSL_LIB_CTX *libctx) {
     mac_params *params = init_mac_params("AES-128-GCM", NULL, iv, sizeof(iv), 0);
     mac_context *ctx = mac_init("GMAC", key, 16, params);
     run_test(ctx); 
-    free_mac_context(ctx);
+    free_mac_context(&ctx);
     free(params);
 }
 
@@ -119,14 +119,14 @@ void test_kmac128(OSSL_LIB_CTX *libctx) {
     printf("Testing KMAC-128: ");
     mac_context *ctx = mac_init("KMAC-128", key, 16, NULL);
     run_test(ctx);
-    free_mac_context(ctx);
+    free_mac_context(&ctx);
 }
 
 void test_kmac256(OSSL_LIB_CTX *libctx) {
     printf("Testing KMAC-256: ");
     mac_context *ctx = mac_init("KMAC-256", key, 32, NULL);
     run_test(ctx);
-    free_mac_context(ctx);
+    free_mac_context(&ctx);
 }
 
 

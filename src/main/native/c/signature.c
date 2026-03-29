@@ -131,22 +131,35 @@ int sv_verify(sv_context *ctx, byte *signature, size_t sig_length) {
     return EVP_DigestVerifyFinal(ctx->mctx, signature, sig_length);
 }
 
-void free_sv_params(sv_params *params) {
+void free_sv_params(sv_params **pparams) {
     // TODO: EVP_MD_free fails
     /*if (params->digest)
         EVP_MD_free(params->digest);
     if (params->mgf1_digest)
         EVP_MD_free(params->mgf1_digest);
     */
-    free(params);
+    if (pparams == NULL || *pparams == NULL) {
+        return;
+    }
+    free(*pparams);
+    *pparams = NULL;
 }
 
-void free_sv_key(sv_key *key) {
-    EVP_PKEY_CTX_free(key->ctx);
-    free(key);
+void free_sv_key(sv_key **pkey) {
+    if (pkey == NULL || *pkey == NULL) {
+        return;
+    }
+
+    EVP_PKEY_CTX_free((*pkey)->ctx);
+    free(*pkey);
+    *pkey = NULL;
 }
 
-void free_sv_context(sv_context *context) {
-    EVP_MD_CTX_free(context->mctx);
-    free(context);
+void free_sv_context(sv_context **pcontext) {
+    if (pcontext == NULL || *pcontext == NULL) {
+        return;
+    }
+    EVP_MD_CTX_free((*pcontext)->mctx);
+    free(*pcontext);
+    *pcontext = NULL;
 }

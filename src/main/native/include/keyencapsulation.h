@@ -14,6 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#ifndef _INCLUDE_KEYENCAPSULATION_H
+#define _INCLUDE_KEYENCAPSULATION_H
+
 #include "jssl.h"
 #include <openssl/evp.h>
 
@@ -47,3 +50,5 @@ void free_kem_keyspec(kem_keyspec *spec);
 
 //TODO: move this to a utils file
 int rsa_keygen(OSSL_LIB_CTX *libctx, int bits, EVP_PKEY **pub, EVP_PKEY **priv);
+
+#endif //_INCLUDE_KEYENCAPSULATION_H

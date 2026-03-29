@@ -14,6 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#ifndef _INCLUDE_DRBG_H
+#define _INCLUDE_DRBG_H
+
 #include <openssl/rand.h>
 #include <openssl/evp.h>
 #include <openssl/core_names.h>
@@ -48,8 +51,8 @@ DRBG* create_DRBG(const char* name, DRBG* parent);
 DRBG* create_DRBG_with_params(const char *name, DRBG *parent, DRBGParams *params);
 
 /* Destroy the given DRBG */
-int free_DRBG(DRBG* generator);
-int free_DRBGParams(DRBGParams* params);
+void free_DRBG(DRBG **generator);
+void free_DRBGParams(DRBGParams **params);
 
 /* Generate a seed of size n_bytes
  * If a parent EVP_RAND was used, generate a seed (bytes) using it
@@ -79,3 +82,4 @@ int next_rand_int(DRBG* generator, int num_bits);
 int next_rand(DRBG* generator, byte output[], int n_bytes);
 
 int next_rand_with_params(DRBG *generator, byte output[], int n_bytes, DRBGParams *params);
+#endif // _INCLUDE_DRBG_H

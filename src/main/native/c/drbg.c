@@ -25,35 +25,34 @@ DRBGParams NO_PARAMS = { DEFAULT_STRENGTH, 0, 0, NULL, 0, NULL, 0 };
  * Return the number of parameters added to `params`
  */
 static int create_params(const char *name, OSSL_PARAM params[]) {
-    if (STR_EQUAL(name, "HASH-DRBG")) {
-        params[0] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_DIGEST, SN_sha512, 0);
-        params[1] = OSSL_PARAM_construct_end();
-        return 2;
-    } else if (STR_EQUAL(name, "HMAC-DRBG")) {
-        params[0] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_MAC, SN_hmac, 0);
-        params[1] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_DIGEST, SN_sha256, 0);
-        params[2] = OSSL_PARAM_construct_end();
-        return 3;
-    } else if (STR_EQUAL(name, "CTR-DRBG")) {
-        params[0] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_CIPHER, SN_aes_256_ctr, 0);
-        params[1] = OSSL_PARAM_construct_end();
-        return 2;
-    } else if (STR_EQUAL(name, "SEED-SRC")) {
+    int param_count = 0;
+    if (str_equal(name, "HASH-DRBG")) {
+        params[param_count++] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_DIGEST, SN_sha512, 0);
+        params[param_count++] = OSSL_PARAM_construct_end();
+    } else if (str_equal(name, "HMAC-DRBG")) {
+        params[param_count++] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_MAC, SN_hmac, 0);
+        params[param_count++] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_DIGEST, SN_sha256, 0);
+        params[param_count++] = OSSL_PARAM_construct_end();
+    } else if (str_equal(name, "CTR-DRBG")) {
+        params[param_count++] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_CIPHER, SN_aes_256_ctr, 0);
+        params[param_count++] = OSSL_PARAM_construct_end();
+    } else if (str_equal(name, "SEED-SRC")) {
 	// TODO: We don't come here in the FIPS mode
-        params[0] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_CIPHER, SN_aes_256_ctr, 0);
-        params[1] = OSSL_PARAM_construct_end();
-        return 2;
-    } else if (STR_EQUAL(name, "TEST-RAND")) {
+        params[param_count++] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_CIPHER, SN_aes_256_ctr, 0);
+        params[param_count++] = OSSL_PARAM_construct_end();
+    } else if (str_equal(name, "TEST-RAND")) {
 	// TODO: We don't come here in the FIPS mode
-        return 0;
     } else {
         // We should never come here!
-        return 0;
     }
+    return param_count;
 }
 DRBG* create_DRBG(const char* name, DRBG* parent) {
     return create_DRBG_with_params(name, parent, NULL);
 }
+
+#define MIN_NUMBER_OF_PARAMS 2
+#define MAX_NUMBER_OF_PARAMS 4
 
 DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_params) {
     EVP_RAND *rand = EVP_RAND_fetch(NULL, name, NULL);
@@ -69,9 +68,10 @@ DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_p
         return NULL;
     }
 
-    OSSL_PARAM params[4];
+    OSSL_PARAM params[MAX_NUMBER_OF_PARAMS];
     int n_params = create_params(name, params);
-    if (n_params < 2) {
+    if (n_params < MIN_NUMBER_OF_PARAMS) {
+	 EVP_RAND_free(rand);
          fprintf(stderr, "Couldn't create params");
          return NULL;
     }
@@ -93,26 +93,28 @@ DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_p
     return newDRBG;
 }
 
-int free_DRBGParams(DRBGParams *params) {
-    if (params == NULL) {
-        return 0;
+void free_DRBGParams(DRBGParams **pparams) {
+    if (pparams == NULL || *pparams == NULL) {
+        return;
     }
-    FREE_IF_NON_NULL(params->additional_data);
-    FREE_IF_NON_NULL(params->personalization_str);
-    FREE_IF_NON_NULL(params);
-    return 1;
+    free((*pparams)->additional_data);
+    free((*pparams)->personalization_str);
+    free(*pparams);
+    *pparams = NULL;
+    return;
 }
 
-int free_DRBG(DRBG *generator) {
-    if (generator == NULL) {
-        return 0;
+void free_DRBG(DRBG **pgenerator) {
+    if (pgenerator == NULL || *pgenerator == NULL) {
+        return;
     }
-    free_DRBGParams(generator->params);
-    free_DRBG(generator->parent);
-    FREE_IF_NON_NULL(generator->seed);
-    EVP_RAND_CTX_free(generator->context);
-    free(generator);
-    return 1;
+    free_DRBGParams(&((*pgenerator)->params));
+    free_DRBG(&((*pgenerator)->parent));
+    free((*pgenerator)->seed);
+    EVP_RAND_CTX_free((*pgenerator)->context);
+    free(*pgenerator);
+    *pgenerator = NULL;
+    return;
 }
 
 int next_rand(DRBG *drbg, byte output[], int n_bytes) {
@@ -135,12 +137,9 @@ int next_rand_int(DRBG *drbg, int num_bits) {
     next_rand(drbg, output, num_bytes);
     output[num_bytes-1] &= mask;
 
-    int o3 = ((0x00ff) & output[3]) << 24;
-    int o2 = ((0x00ff) & output[2]) << 16;
-    int o1 = ((0x00ff) & output[1]) << 8;
-    int o0 = ((0x00ff) & output[0]);
-
-    return o3 | o2 | o1 | o0;
+    int32_t target;
+    memcpy(&target, output, 4);
+    return target;
 }
 
 int generate_seed(DRBG* generator, byte output[], int n_bytes) {

@@ -17,7 +17,6 @@
 import java.util.Arrays;
 import java.security.*;
 import java.security.DrbgParameters;
-import java.security.DrbgParameters.Instantiation;
 import java.security.DrbgParameters.Capability;
 import java.lang.Long;
 import java.security.SecureRandom;

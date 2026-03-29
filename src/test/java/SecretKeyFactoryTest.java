@@ -14,10 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-import java.util.Arrays;
 import java.security.spec.KeySpec;
-import java.security.spec.InvalidKeySpecException;
-import java.security.InvalidKeyException;
 import java.security.Security;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;

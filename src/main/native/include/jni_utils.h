@@ -14,6 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
+#ifndef _INCLUDE_JNI_UTILS_H
+#define _INCLUDE_JNI_UTILS_H
 #include <jni.h>
 #include "jssl.h"
 
@@ -42,3 +45,4 @@ void release_jstring(JNIEnv *env, jstring string, const char *chars);
 char *jcharArray_to_char_array(JNIEnv *env, jcharArray chars);
 
 jlong invokeLongMethod(JNIEnv *env, jobject this, const char *name, const char *signature);
+#endif //_INCLUDE_JNI_UTILS_H

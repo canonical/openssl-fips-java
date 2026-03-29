@@ -91,3 +91,5 @@ test-solib: $(BUILD)/test/bin $(TEST_C_OBJS)
 
 clean:
 	@rm -rf build && rm -f ${JAVA_SRC}/cipher/AES*.java
+
+.PHONY: all gen-code solib test-solib clean

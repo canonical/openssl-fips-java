@@ -35,7 +35,7 @@ void test_xxx_drbg(const char *test, const char *algo) {
     }
     printf("drbg_test/%s: FAIL\n", test);
     result = 1;
-    free_DRBG(drbg);
+    free_DRBG(&drbg);
 }
 
 void test_basic_hmac_drbg() {
@@ -56,7 +56,7 @@ void test_xxx_drbg_fails(const char *test, const char *algo) {
         printf("drbg_test/%s: PASS\n", test);
     } else {
         printf("drbg_test/%s: FAIL\n", test);
-        free_DRBG(drbg);
+        free_DRBG(&drbg);
     }
 }
 
@@ -74,7 +74,7 @@ void test_rand_int_num_bits(const char *algo, int num_bits) {
         printf("drbg_test/test_rand_int_num_bits: FAIL\n");
     } else {
         printf("next_rand_int(%d) = %x (PASS)\n", num_bits, next_rand_int(drbg, num_bits));
-        free_DRBG(drbg);
+        free_DRBG(&drbg);
     }
 }
 

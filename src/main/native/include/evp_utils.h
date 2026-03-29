@@ -14,6 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#ifndef _INCLUDE_EVP_UTILS_H
+#define _INCLUDE_EVP_UTILS_H
 #include <openssl/evp.h>
 #include "jssl.h"
 
@@ -26,4 +28,4 @@ EVP_PKEY *create_public_key(byte* bytes, size_t length);
 /* FIPS-safe decoder-based functions using OSSL_DECODER */
 EVP_PKEY *decode_private_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libctx);
 EVP_PKEY *decode_public_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libctx);
-
+#endif // _INCLUDE_EVP_UTILS_H

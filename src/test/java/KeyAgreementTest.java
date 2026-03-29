@@ -14,14 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-import java.security.Key;
-import java.security.SecureRandom;
 import java.security.Security;
 import java.security.KeyPair;
-import java.util.Arrays;
 import java.security.KeyPairGenerator;
-import java.security.spec.AlgorithmParameterSpec;
-import javax.crypto.SecretKey;
 import javax.crypto.KeyAgreement;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
