@@ -135,14 +135,19 @@ int kdf_derive(OSSL_LIB_CTX *libctx, kdf_spec *spec, kdf_params *params, byte *k
     return EVP_KDF_derive(kctx, keydata, keylength, ossl_params);
 }
         
-void free_kdf_spec(kdf_spec *spec) {
-    void *contained = (void*)spec->hkdf;
+void free_kdf_spec(kdf_spec **pspec) {
+    if (pspec == NULL || *pspec == NULL) {
+        return;
+    }
+    void *contained = (void*)((*pspec)->hkdf);
     free(contained);
-    free(spec);
+    free(*pspec);
+    *pspec = NULL;
 }
 
-void free_kdf_params(kdf_params *params) {
-    void *contained = (void*) params->hkdf;
+void free_kdf_params(kdf_params **pparams) {
+    void *contained = (void*) ((*pparams)->hkdf);
     free(contained);
-    free(params);
+    free(*pparams);
+    *pparams = NULL;
 }

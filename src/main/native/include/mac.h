@@ -14,6 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#ifndef _INCLUDE_MAC_H
+#define _INCLUDE_MAC_H
 #include <openssl/evp.h>
 #include <openssl/params.h>
 
@@ -36,4 +38,5 @@ int mac_update(mac_context *ctx, byte *input, size_t input_size);
 int mac_final_with_input(mac_context *ctx, byte *input, size_t input_size, byte *output, size_t *bytes_written, size_t output_size);
 int mac_final(mac_context *ctx, byte *output, size_t *bytes_written, size_t output_size);
 size_t get_mac_length(mac_context *mac);
-void free_mac_context(mac_context *mac);
+void free_mac_context(mac_context **mac);
+#endif //_INCLUDE_MAC_H

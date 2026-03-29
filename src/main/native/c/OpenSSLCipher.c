@@ -104,5 +104,5 @@ JNIEXPORT void JNICALL Java_com_canonical_openssl_cipher_OpenSSLCipher_updateAAD
 
 JNIEXPORT void JNICALL Java_com_canonical_openssl_cipher_OpenSSLCipher_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_cipher((cipher_context*) handle);
+    free_cipher((cipher_context**) &handle);
 }

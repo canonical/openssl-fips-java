@@ -18,12 +18,25 @@
 #include <openssl/err.h>
 #include <stdio.h>
 
-#define IS_MODE_CCM(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-CCM"))
-#define IS_MODE_GCM(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-GCM"))
-#define IS_MODE_EAX(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-EAX"))
-#define IS_MODE_OCB(ctx) (STR_EQUAL(strrchr(ctx->name, '-'), "-OCB"))
+static inline int is_mode_CCM(cipher_context *ctx) {
+    return ctx != NULL && str_equal(strrchr(ctx->name,'-'), "-CCM");
+}
 
-#define IS_OP_DECRYPT(ctx) (ctx->mode == DECRYPT)
+static inline int is_mode_GCM(cipher_context *ctx) {
+    return ctx != NULL && str_equal(strrchr(ctx->name, '-'), "-GCM");
+}
+
+static inline int is_mode_EAX(cipher_context *ctx) {
+    return ctx != NULL && str_equal(strrchr(ctx->name, '-'), "-EAX");
+}
+
+static inline int is_mode_OCB(cipher_context *ctx) {
+    return ctx != NULL && str_equal(strrchr(ctx->name, '-'), "-OCB");
+}
+
+static inline int is_op_decrypt(cipher_context *ctx) {
+    return ctx != NULL && ctx->mode == DECRYPT;
+}
 
 #define MAX_CIPHER_TABLE_SIZE 256
 #define TAG_LEN 16
@@ -48,15 +61,15 @@ static name_cipher_map cipher_table[MAX_CIPHER_TABLE_SIZE];
 static int table_size;
 
 int get_padding_code(const char *name) {
-    if (IS_NULL(name) || STR_EQUAL(name, "NONE")) {
+    if (name == NULL || str_equal(name, "NONE")) {
         return 0;
-    } else if (STR_EQUAL(name, "PKCS7") || STR_EQUAL(name, "PKCS5")) {
+    } else if (str_equal(name, "PKCS7") || str_equal(name, "PKCS5")) {
         return EVP_PADDING_PKCS7;
-    } else if (STR_EQUAL(name, "ISO10126-2")) {
+    } else if (str_equal(name, "ISO10126-2")) {
         return EVP_PADDING_ISO10126;
-    } else if (STR_EQUAL(name, "X9.23")) {
+    } else if (str_equal(name, "X9.23")) {
         return EVP_PADDING_ANSI923;
-    } else if (STR_EQUAL(name, "ISO7816-4")) {
+    } else if (str_equal(name, "ISO7816-4")) {
         return EVP_PADDING_ISO7816_4;
     } else {
         // TODO: handle an supported padding scheme
@@ -72,7 +85,8 @@ cipher_context* create_cipher_context(OSSL_LIB_CTX *libctx, const char *name, co
     new_context->name = name;
     new_context->context = new_ctx;
     new_context->cipher = EVP_CIPHER_fetch(libctx, name, NULL);
-    if (IS_NULL(new_context->cipher) || IS_NULL(new_context->context)) {
+    if (new_context->cipher == NULL || new_context->context == NULL) {
+        free_cipher(&new_context);
         return NULL;
     }
     new_context->padding = get_padding_code(padding_name);
@@ -83,7 +97,7 @@ cipher_context* create_cipher_context(OSSL_LIB_CTX *libctx, const char *name, co
 void cipher_init(cipher_context * ctx, byte in_buf[], int in_len, unsigned char *key, unsigned char *iv, int iv_len, int mode) {
     EVP_CipherInit_ex(ctx->context, ctx->cipher, NULL, NULL, NULL, mode);
     ctx->mode = mode;
-    if (IS_MODE_CCM(ctx)) {
+    if (is_mode_CCM(ctx)) {
        EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_SET_IVLEN, iv_len, 0);
        EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_SET_TAG, TAG_LEN, mode == ENCRYPT ? 0 : (in_buf + in_len - TAG_LEN));
     }
@@ -95,24 +109,24 @@ void cipher_init(cipher_context * ctx, byte in_buf[], int in_len, unsigned char 
 
 void cipher_update_aad(cipher_context *ctx, int *out_len_ptr, byte aad_buf[], int aad_len) {
     // Just ignore if the algorithm does not support AAD ?
-    if (IS_MODE_CCM(ctx) || IS_MODE_GCM(ctx) || IS_MODE_EAX(ctx) || IS_MODE_OCB(ctx)) {
+    if (is_mode_CCM(ctx) || is_mode_GCM(ctx) || is_mode_EAX(ctx) || is_mode_OCB(ctx)) {
         cipher_update(ctx, NULL, out_len_ptr, aad_buf, aad_len);
     }
 }
 
 void cipher_update(cipher_context *ctx, byte out_buf[], int *out_len_ptr, byte in_buf[], int in_len) {
-    if (IS_MODE_CCM(ctx)) {
-        EVP_CipherUpdate(ctx->context, NULL, out_len_ptr, NULL, IS_OP_DECRYPT(ctx) ? in_len-TAG_LEN : in_len);
+    if (is_mode_CCM(ctx)) {
+        EVP_CipherUpdate(ctx->context, NULL, out_len_ptr, NULL, is_op_decrypt(ctx) ? in_len-TAG_LEN : in_len);
     }
 
     if (!EVP_CipherUpdate(ctx->context, out_buf, out_len_ptr, in_buf,
-                        (IS_MODE_CCM(ctx) && IS_OP_DECRYPT(ctx)) ? in_len-TAG_LEN : in_len)) {
+                        (is_mode_CCM(ctx) && is_op_decrypt(ctx)) ? in_len-TAG_LEN : in_len)) {
         ERR_print_errors_fp(stderr);
     }
 }
 
 void cipher_do_final(cipher_context *ctx, byte *out_buf, int *out_len_ptr) {
-    if (ctx->mode == DECRYPT && IS_MODE_GCM(ctx)) {
+    if (ctx->mode == DECRYPT && is_mode_GCM(ctx)) {
         EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_GCM_SET_TAG, TAG_LEN, ctx->gcm_tag);
     }
 
@@ -121,17 +135,21 @@ void cipher_do_final(cipher_context *ctx, byte *out_buf, int *out_len_ptr) {
     }
 
     if (ctx->mode == ENCRYPT) {
-        if(IS_MODE_CCM(ctx)) {
+        if(is_mode_CCM(ctx)) {
             *out_len_ptr = TAG_LEN;
             EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_GET_TAG, TAG_LEN, out_buf);
-        } else if(IS_MODE_GCM(ctx)) {
+        } else if(is_mode_GCM(ctx)) {
             EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_GCM_GET_TAG, TAG_LEN, ctx->gcm_tag);
         }
     }
 }
 
-void free_cipher(cipher_context *ctx) {
-    EVP_CIPHER_CTX_free(ctx->context);
-    EVP_CIPHER_free(ctx->cipher);
-    free(ctx);
+void free_cipher(cipher_context **pctx) {
+    if (pctx == NULL || *pctx == NULL) {
+        return;
+    }
+    EVP_CIPHER_CTX_free((*pctx)->context);
+    EVP_CIPHER_free((*pctx)->cipher);
+    free(*pctx);
+    *pctx = NULL;
 }

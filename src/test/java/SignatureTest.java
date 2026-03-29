@@ -15,23 +15,14 @@
  *
  */
 import com.canonical.openssl.signature.*;
-import com.canonical.openssl.key.OpenSSLKey;
 import com.canonical.openssl.key.OpenSSLPublicKey;
 import com.canonical.openssl.key.OpenSSLPrivateKey;
 import com.canonical.openssl.key.KeyConverter;
 import java.security.PublicKey;
 import java.security.PrivateKey;
-import java.util.Arrays;
 import java.nio.ByteBuffer;
-import java.security.spec.AlgorithmParameterSpec;
-import java.security.AlgorithmParameters;
-import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.SecureRandom;
-import java.security.SignatureException;
 import java.security.Security;
 import java.security.Signature;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;

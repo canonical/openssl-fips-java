@@ -14,6 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#ifndef _INCLUDE_CIPHER_H
+#define _INCLUDE_CIPHER_H
 #include <openssl/evp.h>
 #include <openssl/types.h>
 #include <jssl.h>
@@ -41,4 +43,5 @@ void cipher_update(cipher_context *ctx, byte out[], int *out_len_ptr, byte in[],
 
 void cipher_do_final(cipher_context *ctx, byte *out, int *out_len_ptr);
 
-void free_cipher(cipher_context *ctx);
+void free_cipher(cipher_context **ctx);
+#endif //_INCLUDE_CIPHER_H

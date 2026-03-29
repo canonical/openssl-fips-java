@@ -14,23 +14,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-import javax.crypto.CipherSpi;
 import javax.crypto.Cipher;
 import java.security.Key;
 import java.security.Security;
-import java.security.AlgorithmParameters;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
-import javax.crypto.ShortBufferException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.BadPaddingException;
 import javax.crypto.spec.IvParameterSpec;
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.List;
 import java.security.spec.AlgorithmParameterSpec;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
 import org.junit.Test;
