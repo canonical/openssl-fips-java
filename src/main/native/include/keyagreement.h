@@ -14,6 +14,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
+#ifndef _INCLUDE_KEYAGREEMENT_H
+#define _INCLUDE_KEYAGREEMENT_H
+
 #include "jssl.h"
 #include <openssl/evp.h>
 
@@ -49,6 +53,8 @@ int get_shared_secret_bytes(key_agreement *agreement, byte secret[]);
 
 EVP_PKEY *generate_key(key_agreement_algorithm algo);
 
-void free_key_agreement(key_agreement *this);
+void free_key_agreement(key_agreement **this);
 
-void free_shared_secret(shared_secret *this);
+void free_shared_secret(shared_secret **this);
+
+#endif //_INCLUDE_KEYAGREEMENT_H

@@ -58,9 +58,9 @@ int test(key_agreement_algorithm algo, OSSL_LIB_CTX *libctx) {
         rc = 1;
     }
 
-    free_shared_secret(alice_secret);
-    free_shared_secret(bob_secret);
-    free_key_agreement(alice);
+    free_shared_secret(&alice_secret);
+    free_shared_secret(&bob_secret);
+    free_key_agreement(&alice);
     //free_key_agreement(bob); // keys are shared, don't free twice
     free(bob);
     return rc;

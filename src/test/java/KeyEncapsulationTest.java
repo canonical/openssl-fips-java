@@ -17,10 +17,8 @@
 import java.security.KeyPair;
 import java.security.PublicKey;
 import java.security.PrivateKey;
-import java.util.Arrays;
 import java.security.KeyPairGenerator;
 import javax.crypto.KEM;
-import javax.crypto.KEM.Encapsulated;
 import javax.crypto.KEM.Encapsulator;
 import javax.crypto.KEM.Decapsulator;
 import javax.crypto.SecretKey;

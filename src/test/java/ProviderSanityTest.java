@@ -17,14 +17,8 @@
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 import java.security.Security;
 import java.security.SecureRandom;
-import java.security.NoSuchAlgorithmException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Field;
 import java.lang.Class;
-import java.lang.IllegalAccessException;
-import java.lang.NoSuchMethodException;
-import java.lang.NoSuchFieldException;
-import java.lang.reflect.InvocationTargetException;
 import javax.crypto.KeyAgreement;
 import javax.crypto.KEM;
 import javax.crypto.Mac;
@@ -46,7 +40,6 @@ import org.junit.Test;
 import org.junit.BeforeClass;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 
 public class ProviderSanityTest {

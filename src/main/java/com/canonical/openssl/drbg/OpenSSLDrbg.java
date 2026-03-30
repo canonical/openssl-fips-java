@@ -22,7 +22,6 @@ import java.lang.ref.Cleaner;
 import java.security.SecureRandomSpi;
 import java.security.SecureRandomParameters;
 import java.security.DrbgParameters;
-import java.security.Provider;
 
 /* This implementation will be exercised by the user through the
  * java.security.SecureRandom API which is marked thread-safe.

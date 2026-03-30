@@ -45,8 +45,8 @@ jlong init_signature(JNIEnv *env, jobject this, jstring sig_name, jobject jkey, 
     sv_key *key = sv_init_key(global_libctx, evpkey);
     sv_type type = svtype_from_str(jstring_to_char_array(env, sig_name));
     sv_context *svc = sv_init(global_libctx, key, svparams, state, type);
-    free_sv_params(svparams);
-    free_sv_key(key);
+    free_sv_params(&svparams);
+    free_sv_key(&key);
     return (jlong)svc;
 }
 
@@ -94,13 +94,13 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_signature_OpenSSLSignatu
     sv_context *ctx = (sv_context*)get_long_field(env, this, "nativeHandle");
     size_t sig_length = 0;
     if (sv_sign(ctx, NULL, &sig_length) < 0) {
-        free_sv_context(ctx);
+        free_sv_context(&ctx);
         return NULL;
     }
 
     byte *signature = (byte *)malloc(sig_length);
     if (sv_sign(ctx, signature, &sig_length) < 0) {
-        free_sv_context(ctx);
+        free_sv_context(&ctx);
         return NULL;
     }
     return byte_array_to_jbyteArray(env, signature, sig_length);
@@ -123,5 +123,5 @@ JNIEXPORT jboolean JNICALL Java_com_canonical_openssl_signature_OpenSSLSignature
 
 JNIEXPORT void JNICALL Java_com_canonical_openssl_signature_OpenSSLSignature_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong nativeHandle) {
-    free_sv_context((sv_context*) nativeHandle);
+    free_sv_context((sv_context**) &nativeHandle);
 }

@@ -17,7 +17,6 @@
 package com.canonical.openssl.keyagreement;
 
 import java.security.Key;
-import java.security.SecureRandom;
 
 public final class ECDHKeyAgreement extends OpenSSLKeyAgreement {
     protected long initialize(Key key) {

@@ -37,8 +37,8 @@ void test_sign_and_verify(OSSL_LIB_CTX *libctx, EVP_PKEY *public_key, EVP_PKEY *
 
     sv_context *svc = sv_init(libctx, key, p, SIGN, type);
     if (NULL == svc) {
-        free_sv_params(p);
-        free_sv_key(key);
+        free_sv_params(&p);
+        free_sv_key(&key);
         printf("FAILED (sign init)\n");
         rc = 1;
         return;
@@ -47,9 +47,9 @@ void test_sign_and_verify(OSSL_LIB_CTX *libctx, EVP_PKEY *public_key, EVP_PKEY *
 
     size_t sig_length = 0;
     if (sv_sign(svc, NULL, &sig_length) < 0) {
-        free_sv_params(p);
-        free_sv_key(key);
-        free_sv_context(svc);
+        free_sv_params(&p);
+        free_sv_key(&key);
+        free_sv_context(&svc);
         printf("FAILED (signing)\n");
         rc = 1;
         return;
@@ -57,9 +57,9 @@ void test_sign_and_verify(OSSL_LIB_CTX *libctx, EVP_PKEY *public_key, EVP_PKEY *
 
     byte *signature = (byte *)malloc(sig_length);
     if (sv_sign(svc, signature, &sig_length) < 0) {
-        free_sv_params(p);
-        free_sv_key(key);
-        free_sv_context(svc);
+        free_sv_params(&p);
+        free_sv_key(&key);
+        free_sv_context(&svc);
         printf("FAILED (signing)\n");
         rc = 1;
         return;
@@ -68,26 +68,26 @@ void test_sign_and_verify(OSSL_LIB_CTX *libctx, EVP_PKEY *public_key, EVP_PKEY *
     sv_key *pubkey = sv_init_key(libctx, public_key);
     sv_context *svc1 = sv_init(libctx, pubkey, p, VERIFY, type);
     if (NULL == svc1) {
-        free_sv_params(p);
-        free_sv_key(pubkey);
+        free_sv_params(&p);
+        free_sv_key(&pubkey);
         printf("FAILED (verify init)\n");
         rc = 1;
         return;
     }
 
     if (sv_update(svc1, message, strlen(message)) <= 0) {
-        free_sv_params(p);
-        free_sv_key(pubkey);
-        free_sv_context(svc1);
+        free_sv_params(&p);
+        free_sv_key(&pubkey);
+        free_sv_context(&svc1);
         printf("FAILED (verify update) \n");
         rc = 1;
         return;  
     }
 
     if (sv_verify(svc1, signature, sig_length) <= 0) {
-        free_sv_params(p);
-        free_sv_key(pubkey);
-        free_sv_context(svc1);
+        free_sv_params(&p);
+        free_sv_key(&pubkey);
+        free_sv_context(&svc1);
         printf("FAILED (verify)\n");
         rc = 1;
         return;

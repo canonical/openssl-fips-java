@@ -111,13 +111,20 @@ EVP_PKEY *generate_key(key_agreement_algorithm algo) {
     return key;
 }
 
-void free_shared_secret(shared_secret *this) {
-    free(this->bytes);
-    free(this);
+void free_shared_secret(shared_secret **pthis) {
+    if (pthis == NULL || *pthis == NULL)
+        return;
+    free((*pthis)->bytes);
+    free(*pthis);
+    *pthis = NULL;
 }
 
-void free_key_agreement(key_agreement *this) {
-    EVP_PKEY_free(this->private_key);
-    EVP_PKEY_free(this->peer_public_key);
-    free(this);
+void free_key_agreement(key_agreement **pthis) {
+    if (pthis == NULL || *pthis == NULL) {
+        return;
+    }
+    EVP_PKEY_free((*pthis)->private_key);
+    EVP_PKEY_free((*pthis)->peer_public_key);
+    free(*pthis);
+    *pthis = NULL;
 }

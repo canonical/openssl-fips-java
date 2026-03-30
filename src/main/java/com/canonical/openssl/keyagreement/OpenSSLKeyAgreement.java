@@ -24,7 +24,6 @@ import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
 import javax.crypto.KeyAgreementSpi;
 import javax.crypto.SecretKey;
-import java.util.Base64;
 
 /* This implementation will be exercised by the user through the
  * javax.crypto.KeyAgreement API which isn't marked thread-safe.

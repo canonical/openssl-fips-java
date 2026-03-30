@@ -83,5 +83,5 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doFinal0
  */
 JNIEXPORT void JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_mac_context((mac_context*) handle);
+    free_mac_context((mac_context**) &handle);
 }

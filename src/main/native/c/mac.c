@@ -56,7 +56,7 @@ mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params 
     EVP_MAC_free(mac);
     if (NULL == ctx) { 
         ERR_print_errors_fp(stderr);
-        free_mac_context(new_ctx);
+        free_mac_context(&new_ctx);
         return NULL;
     }
     new_ctx->ctx = ctx;
@@ -65,7 +65,7 @@ mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params 
     }
     if (0 == EVP_MAC_init(new_ctx->ctx, (const unsigned char*)key, key_length, NULL)) {
         ERR_print_errors_fp(stderr);
-        free_mac_context(new_ctx);
+        free_mac_context(&new_ctx);
         return NULL;
     }   
     return new_ctx;
@@ -73,7 +73,7 @@ mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params 
 
 int mac_update(mac_context *ctx, byte *input, size_t input_size) {
     if (0 == EVP_MAC_update(ctx->ctx, input, input_size)) {
-        free_mac_context(ctx);
+        free_mac_context(&ctx);
         return 0;
     }
     return 1;
@@ -81,7 +81,7 @@ int mac_update(mac_context *ctx, byte *input, size_t input_size) {
 
 int mac_final(mac_context *ctx, byte *output, size_t *bytes_written, size_t output_size) {
     if (0 == EVP_MAC_final(ctx->ctx, output, bytes_written, output_size)) {
-        free_mac_context(ctx);
+        free_mac_context(&ctx);
         return 0;
     }
     return 1;
@@ -90,11 +90,11 @@ int mac_final(mac_context *ctx, byte *output, size_t *bytes_written, size_t outp
 int mac_final_with_input(mac_context *ctx, byte *input, size_t input_size,
                      byte *output, size_t *bytes_written, size_t output_size) {
     if (0 == mac_update(ctx, input, input_size)) {
-        free_mac_context(ctx);
+        free_mac_context(&ctx);
         return 0;
     }
     if (0 == mac_final(ctx, output, bytes_written, output_size)) {
-        free_mac_context(ctx);
+        free_mac_context(&ctx);
         return 0;
     }
     return 1;
@@ -104,7 +104,11 @@ size_t get_mac_length(mac_context *mac) {
     return EVP_MAC_CTX_get_mac_size(mac->ctx);    
 }
 
-void free_mac_context(mac_context *mac) {
-    EVP_MAC_CTX_free(mac->ctx);
-    free(mac);
+void free_mac_context(mac_context **pmac) {
+    if (pmac == NULL || *pmac == NULL) {
+        return;
+    }
+    EVP_MAC_CTX_free((*pmac)->ctx);
+    free(*pmac);
+    *pmac = NULL;
 }

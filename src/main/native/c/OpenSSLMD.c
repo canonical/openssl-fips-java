@@ -65,5 +65,5 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_md_OpenSSLMD_doFinal0
  */
 JNIEXPORT void JNICALL Java_com_canonical_openssl_md_OpenSSLMD_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-   free_md_context((md_context*)handle); 
+   free_md_context((md_context**)&handle);
 }
