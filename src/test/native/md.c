@@ -103,5 +103,6 @@ int main(int argc, char ** argv) {
     test_digest("SHA3-512", libctx);
     test_digest("KECCAK-KMAC-128", libctx);
     test_digest("KECCAK-KMAC-256", libctx);
+    unload_libctx(libctx);
     return rc;
 }

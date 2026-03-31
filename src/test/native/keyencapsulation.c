@@ -61,8 +61,8 @@ int main(int argc, char ** argv) {
         printf("FAILED\n");
         rc = 1;
     }
-    free_kem_keyspec(spec_alice);
-    //free_kem_keyspec(spec_bob); //alice and bob share keys, don't delete twice
+    free_kem_keyspec(&spec_alice);
+    free_kem_keyspec(&spec_bob);
     free(spec_bob);
     return rc; 
 } 

@@ -60,6 +60,7 @@ void test_sign_and_verify(OSSL_LIB_CTX *libctx, EVP_PKEY *public_key, EVP_PKEY *
         free_sv_params(&p);
         free_sv_key(&key);
         free_sv_context(&svc);
+        free(signature);
         printf("FAILED (signing)\n");
         rc = 1;
         return;
@@ -69,15 +70,20 @@ void test_sign_and_verify(OSSL_LIB_CTX *libctx, EVP_PKEY *public_key, EVP_PKEY *
     sv_context *svc1 = sv_init(libctx, pubkey, p, VERIFY, type);
     if (NULL == svc1) {
         free_sv_params(&p);
+        free_sv_key(&key);
         free_sv_key(&pubkey);
+        free(signature);
         printf("FAILED (verify init)\n");
         rc = 1;
         return;
     }
 
     if (sv_update(svc1, message, strlen(message)) <= 0) {
+        free(signature);
         free_sv_params(&p);
+        free_sv_key(&key);
         free_sv_key(&pubkey);
+        free_sv_context(&svc);
         free_sv_context(&svc1);
         printf("FAILED (verify update) \n");
         rc = 1;
@@ -85,14 +91,23 @@ void test_sign_and_verify(OSSL_LIB_CTX *libctx, EVP_PKEY *public_key, EVP_PKEY *
     }
 
     if (sv_verify(svc1, signature, sig_length) <= 0) {
+        free(signature);
         free_sv_params(&p);
+        free_sv_key(&key);
         free_sv_key(&pubkey);
+        free_sv_context(&svc);
         free_sv_context(&svc1);
         printf("FAILED (verify)\n");
         rc = 1;
         return;
     }
 
+    free(signature);
+    free_sv_params(&p);
+    free_sv_key(&key);
+    free_sv_key(&pubkey);
+    free_sv_context(&svc);
+    free_sv_context(&svc1);
     printf("PASSED\n");
 }
 
@@ -102,6 +117,8 @@ void test_rsa_sign_and_verify(OSSL_LIB_CTX *libctx) {
     EVP_PKEY *public_key = NULL, *private_key = NULL;
     rsa_keygen(libctx, 4096, &public_key, &private_key);
     test_sign_and_verify(libctx, public_key, private_key, "SHA-256", SV_RSA);
+    EVP_PKEY_free(public_key);
+    EVP_PKEY_free(private_key);
 }
 
 void test_ed25519_sign_and_verify(OSSL_LIB_CTX *libctx) {
@@ -154,5 +171,6 @@ int main(int argc, char ** argv) {
     test_rsa_sign_and_verify(libctx);
     //test_ed25519_sign_and_verify(libctx);
     //test_ed448_sign_and_verify(libctx);
+    unload_libctx(libctx);
     return rc;
 }

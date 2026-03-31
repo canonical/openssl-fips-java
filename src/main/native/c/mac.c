@@ -54,21 +54,23 @@ mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params 
     EVP_MAC *mac = EVP_MAC_fetch(NULL, algorithm, NULL);
     EVP_MAC_CTX *ctx = EVP_MAC_CTX_new(mac);
     EVP_MAC_free(mac);
-    if (NULL == ctx) { 
-        ERR_print_errors_fp(stderr);
-        free_mac_context(&new_ctx);
-        return NULL;
+    if (NULL == ctx) {
+        goto error;
     }
     new_ctx->ctx = ctx;
     if (NULL != params) {
         set_params(new_ctx->ctx, params);
     }
     if (0 == EVP_MAC_init(new_ctx->ctx, (const unsigned char*)key, key_length, NULL)) {
-        ERR_print_errors_fp(stderr);
-        free_mac_context(&new_ctx);
-        return NULL;
+        goto error;
     }   
     return new_ctx;
+
+error:
+    ERR_print_errors_fp(stderr);
+    free_mac_context(&new_ctx);
+    return NULL;
+
 }
 
 int mac_update(mac_context *ctx, byte *input, size_t input_size) {
@@ -90,14 +92,16 @@ int mac_final(mac_context *ctx, byte *output, size_t *bytes_written, size_t outp
 int mac_final_with_input(mac_context *ctx, byte *input, size_t input_size,
                      byte *output, size_t *bytes_written, size_t output_size) {
     if (0 == mac_update(ctx, input, input_size)) {
-        free_mac_context(&ctx);
-        return 0;
+        goto error;
     }
     if (0 == mac_final(ctx, output, bytes_written, output_size)) {
-        free_mac_context(&ctx);
-        return 0;
+        goto error;
     }
     return 1;
+
+error:
+    free_mac_context(&ctx);
+    return 0;
 }
 
 size_t get_mac_length(mac_context *mac) {

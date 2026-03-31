@@ -80,5 +80,6 @@ int main(int argc, char ** argv) {
     int rc;
     rc = test_pbkdf2(libctx);
     rc = test_hkdf(libctx);
+    unload_libctx(libctx);
     return rc;
 }
