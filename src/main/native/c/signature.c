@@ -80,11 +80,11 @@ sv_context *sv_init(OSSL_LIB_CTX *libctx, sv_key *key, sv_params *params, sv_sta
     EVP_PKEY *pkey = EVP_PKEY_CTX_get0_pkey(key->ctx);
     if (op == SIGN) {
         if (EVP_DigestSignInit_ex(md_ctx, NULL, params->digest_type, libctx, NULL, pkey, ossl_params) <= 0) {
-            return NULL;
+            goto error;
         }
     } else {
         if (EVP_DigestVerifyInit_ex(md_ctx, NULL, params->digest_type, libctx, NULL, pkey, ossl_params) <= 0) {
-            return NULL;
+            goto error;
         }
     }
 
@@ -96,7 +96,10 @@ sv_context *sv_init(OSSL_LIB_CTX *libctx, sv_key *key, sv_params *params, sv_sta
     new_context->length = 0;
     new_context->mctx = md_ctx;
     return new_context;
- 
+
+error:
+   EVP_MD_CTX_free(md_ctx);
+   return NULL;
 }
 
 int sv_update(sv_context *ctx, byte *data, size_t length) {

@@ -66,13 +66,22 @@ kem_keyspec *init_kem_keyspec_with_key(EVP_PKEY *rsa_pub_key, EVP_PKEY *rsa_priv
     spec->wrapped_key = NULL;
     spec->secret_length = 0;
     spec->wrapped_key_length = 0;
+    spec->operation = DECAPSULATE;
     return spec;
 }
 
-void free_kem_keyspec(kem_keyspec *spec) {
-    free(spec->wrapped_key);
-    free(spec->secret);
-    free(spec);
+void free_kem_keyspec(kem_keyspec **spec) {
+    if (spec == NULL || *spec == NULL)
+        return;
+
+    if ((*spec)->operation == ENCAPSULATE) {
+        free((*spec)->wrapped_key);
+	EVP_PKEY_free((*spec)->public_key);
+    }
+    free((*spec)->secret);
+    EVP_PKEY_free((*spec)->private_key);
+    free(*spec);
+    *spec = NULL;
 }
 
 EVP_PKEY_CTX *initialize_encapsulation(kem_keyspec *spec) {
@@ -81,72 +90,92 @@ EVP_PKEY_CTX *initialize_encapsulation(kem_keyspec *spec) {
 
     EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_pkey(spec->libctx, spec->public_key, NULL);
     if (ctx == NULL) {
-        return NULL;
+        goto error;
     }
 
     if (EVP_PKEY_encapsulate_init(ctx, NULL) <= 0) {
-        return NULL;
+        goto error;
     }
 
     if (EVP_PKEY_CTX_set_kem_op(ctx, "RSASVE") <= 0) {
-        return NULL;
+        goto error;
     }
 
     if (EVP_PKEY_encapsulate(ctx, NULL, &wrapped_key_length, NULL, &secret_length) <= 0) {
-        return NULL;
+        goto error;
     }
 
     spec->secret_length = secret_length;
     spec->wrapped_key_length = wrapped_key_length;
     spec->secret = (byte *)malloc(secret_length);
     spec->wrapped_key = (byte *)malloc(wrapped_key_length);
-
+    spec->operation = ENCAPSULATE;
     return ctx;
+
+ error:
+    if (ctx != NULL) {
+        EVP_PKEY_CTX_free(ctx);
+    }
+    return NULL;
 }
 
 EVP_PKEY_CTX *initialize_decapsulation(kem_keyspec *spec) {
     size_t secret_length = 0;
+    EVP_PKEY_CTX *ctx = NULL;
+
     if (spec->wrapped_key == NULL || spec->wrapped_key_length <= 0) {
-        return NULL;
+        goto error;
     }
 
-    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_pkey(spec->libctx, spec->private_key, NULL);
+    ctx = EVP_PKEY_CTX_new_from_pkey(spec->libctx, spec->private_key, NULL);
     if (ctx == NULL) {
-        return NULL;
+        goto error;
     }
 
     if (EVP_PKEY_decapsulate_init(ctx, NULL) <= 0) {
-        return NULL;
+        goto error;
     }
 
     if (EVP_PKEY_CTX_set_kem_op(ctx, "RSASVE") <= 0) {
-        return NULL;
+        goto error;
     }
 
     if (EVP_PKEY_decapsulate(ctx, NULL, &secret_length, spec->wrapped_key, spec->wrapped_key_length) <= 0) {
-        return NULL;
+        goto error;
     }
 
     spec->secret = OPENSSL_malloc(secret_length);
     spec->secret_length = secret_length;
-
     return ctx;
+
+error:
+    if (ctx)
+        EVP_PKEY_CTX_free(ctx);
+    return NULL;
 }
 
 int get_secret_size(kem_keyspec *spec, int is_encap) {
+    EVP_PKEY_CTX *ctx = NULL;
     if (is_encap)
-        initialize_encapsulation(spec);
+        ctx = initialize_encapsulation(spec);
     else
-        initialize_decapsulation(spec);
+        ctx = initialize_decapsulation(spec);
+
+    if (ctx)
+        EVP_PKEY_CTX_free(ctx);
 
     return spec->secret_length;
 }
 
 int get_encapsulation_size(kem_keyspec *spec, int is_encap) {
+    EVP_PKEY_CTX *ctx = NULL;
     if (is_encap)
-        initialize_encapsulation(spec);
+        ctx = initialize_encapsulation(spec);
     else
-        initialize_decapsulation(spec);
+        ctx = initialize_decapsulation(spec);
+
+    if (ctx)
+        EVP_PKEY_CTX_free(ctx);
 
     return spec->wrapped_key_length;
 }
@@ -154,15 +183,22 @@ int get_encapsulation_size(kem_keyspec *spec, int is_encap) {
 
 int generate_and_wrap(kem_keyspec *spec) {
     EVP_PKEY_CTX *ctx = initialize_encapsulation(spec);
-
-    if (spec->secret == NULL || spec->wrapped_key == NULL) {
-        return 1;
+    int rc = 0;
+    if (ctx == NULL || spec->secret == NULL || spec->wrapped_key == NULL) {
+        rc = 1;
+	goto error;
     }
 
     if (EVP_PKEY_encapsulate(ctx, spec->wrapped_key, &(spec->wrapped_key_length), spec->secret, &(spec->secret_length)) <= 0) {
-        return 1;
+        rc = 1;
+	goto error;
     }
-    return 0;
+
+error:
+    if (ctx)
+        EVP_PKEY_CTX_free(ctx);
+
+    return rc;
 }
 
 int set_wrapped_key(kem_keyspec *spec, byte *wrapped_key, int length) {
@@ -172,12 +208,19 @@ int set_wrapped_key(kem_keyspec *spec, byte *wrapped_key, int length) {
 
 int unwrap(kem_keyspec *spec) {
     EVP_PKEY_CTX *ctx = initialize_decapsulation(spec);
-    if (spec->secret == NULL) {
-        return 1;
+    int rc = 0;
+    if (ctx == NULL || spec->secret == NULL) {
+        rc = 1;
+	goto error;
     }
 
     if (EVP_PKEY_decapsulate(ctx, spec->secret, &spec->secret_length, spec->wrapped_key, spec->wrapped_key_length) <= 0) {
-        return 1;
+        rc = 1;
+	goto error;
     }
-    return 0;
+
+error:
+    if (ctx)
+        EVP_PKEY_CTX_free(ctx);
+    return rc;
 }

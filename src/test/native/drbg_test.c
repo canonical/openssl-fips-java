@@ -30,6 +30,7 @@ void test_xxx_drbg(const char *test, const char *algo) {
     for (int i = 0; i < 10; i++) {
         if(output1[i] != output2[i]) {
             printf("drbg_test/%s: PASS\n", test);
+	    free_DRBG(&drbg);
             return;
         }
     }
@@ -79,7 +80,7 @@ void test_rand_int_num_bits(const char *algo, int num_bits) {
 }
 
 int main(int argc, char ** argv) {
-    load_openssl_fips_provider("/usr/local/ssl/openssl.cnf");
+    OSSL_LIB_CTX *libctx = load_openssl_fips_provider("/usr/local/ssl/openssl.cnf");
     test_basic_hmac_drbg();
     test_basic_hash_drbg();
     test_basic_ctr_drbg();
@@ -89,5 +90,6 @@ int main(int argc, char ** argv) {
     test_rand_int_num_bits("HMAC-DRBG", 16);
     test_rand_int_num_bits("HASH-DRBG", 30);
     test_rand_int_num_bits("HASH-DRBG", 32);
+    unload_libctx(libctx);
     return result;
 }

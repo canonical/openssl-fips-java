@@ -141,6 +141,6 @@ int main(int argc, char ** argv) {
         }
         cipher_name = cipher_type[idx++];
     }
-
+    unload_libctx(libctx);
     return rc;
 }

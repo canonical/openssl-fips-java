@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
     int rc = 0;
     rc = test(DIFFIE_HELLMAN, libctx);
     rc = test(ELLIPTIC_CURVE, libctx);
+    unload_libctx(libctx);
     return rc;
 }
 

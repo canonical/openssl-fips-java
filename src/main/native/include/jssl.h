@@ -22,6 +22,7 @@
 #include <stdlib.h>
 
 OSSL_LIB_CTX* load_openssl_fips_provider(const char*);
+void unload_libctx(OSSL_LIB_CTX *libctx);
 
 /* Utility function for string comparison */
 static inline int str_equal(const char *str1, const char *str2) {

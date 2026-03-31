@@ -76,5 +76,5 @@ JNIEXPORT jint JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA
 
 JNIEXPORT void JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA_00024RSAKEMDecapsulator_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_kem_keyspec((kem_keyspec*)handle);
+    free_kem_keyspec((kem_keyspec**)&handle);
 }

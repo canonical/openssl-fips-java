@@ -121,6 +121,7 @@ int kdf_derive(OSSL_LIB_CTX *libctx, kdf_spec *spec, kdf_params *params, byte *k
 
     EVP_KDF *kdf = NULL;
     EVP_KDF_CTX *kctx = NULL;
+    int ret = 0;
 
     kdf = EVP_KDF_fetch(libctx, get_kdf_name(type), NULL);
     if (kdf == NULL) {
@@ -132,7 +133,18 @@ int kdf_derive(OSSL_LIB_CTX *libctx, kdf_spec *spec, kdf_params *params, byte *k
         return 0;
     }
 
-    return EVP_KDF_derive(kctx, keydata, keylength, ossl_params);
+    ret = EVP_KDF_derive(kctx, keydata, keylength, ossl_params);
+
+error:
+    if (kctx != NULL) {
+        EVP_KDF_CTX_free(kctx);
+    }
+
+    if (kdf != NULL) {
+        EVP_KDF_free(kdf);
+    }
+
+    return ret;
 }
         
 void free_kdf_spec(kdf_spec **pspec) {

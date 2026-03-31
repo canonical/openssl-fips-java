@@ -55,25 +55,26 @@ DRBG* create_DRBG(const char* name, DRBG* parent) {
 #define MAX_NUMBER_OF_PARAMS 4
 
 DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_params) {
-    EVP_RAND *rand = EVP_RAND_fetch(NULL, name, NULL);
+    EVP_RAND *rand = NULL;
+    EVP_RAND_CTX *context = NULL;
+
+    rand = EVP_RAND_fetch(NULL, name, NULL);
     if (NULL == rand) {
         fprintf(stderr, "Couldn't allocate EVP_RAND: %s\n", name);
-        return NULL;
+        goto error;
     }
     
-    EVP_RAND_CTX * context = EVP_RAND_CTX_new(rand, parent == NULL ? NULL : parent->context);
+    context = EVP_RAND_CTX_new(rand, parent == NULL ? NULL : parent->context);
     if (NULL == context) {
-        EVP_RAND_free(rand);
         fprintf(stderr, "Couldn't allocate EVP_RAND_CTX\n");
-        return NULL;
+        goto error;
     }
 
     OSSL_PARAM params[MAX_NUMBER_OF_PARAMS];
     int n_params = create_params(name, params);
     if (n_params < MIN_NUMBER_OF_PARAMS) {
-	 EVP_RAND_free(rand);
-         fprintf(stderr, "Couldn't create params");
-         return NULL;
+        fprintf(stderr, "Couldn't create params");
+        goto error;
     }
 
     if (NULL == drbg_params) {
@@ -91,6 +92,15 @@ DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_p
     newDRBG->params = drbg_params; 
     newDRBG->parent = parent;
     return newDRBG;
+
+error:
+    if ( rand != NULL ) {
+        EVP_RAND_free(rand);
+    }
+    if ( context != NULL ) {
+        EVP_RAND_CTX_free(context);
+    }
+    return NULL;
 }
 
 void free_DRBGParams(DRBGParams **pparams) {

@@ -20,6 +20,10 @@
 #include "jssl.h"
 #include <openssl/evp.h>
 
+typedef enum kem_op {
+    ENCAPSULATE, DECAPSULATE
+} kem_op;
+
 typedef struct kem_keyspec {
     OSSL_LIB_CTX *libctx;
     EVP_PKEY *public_key;
@@ -28,9 +32,8 @@ typedef struct kem_keyspec {
     size_t secret_length;
     byte *wrapped_key;
     size_t wrapped_key_length;
+    kem_op operation;
 } kem_keyspec;
-
-void free_kem_keyspec(kem_keyspec *spec);
 
 int get_secret_size(kem_keyspec *spec, int is_encap);
 
@@ -46,7 +49,7 @@ int set_wrapped_key(kem_keyspec *spec, byte *wrapped_key, int length);
 
 int unwrap(kem_keyspec *spec);
 
-void free_kem_keyspec(kem_keyspec *spec);
+void free_kem_keyspec(kem_keyspec **spec);
 
 //TODO: move this to a utils file
 int rsa_keygen(OSSL_LIB_CTX *libctx, int bits, EVP_PKEY **pub, EVP_PKEY **priv);

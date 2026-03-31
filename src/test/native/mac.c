@@ -142,6 +142,7 @@ void test_mac_context_creation(OSSL_LIB_CTX *libctx) {
 int main(int argc, char ** argv) {
     OSSL_LIB_CTX *libctx = load_openssl_fips_provider("/usr/local/ssl/openssl.cnf");
     test_mac_context_creation(libctx);
+    unload_libctx(libctx);
     return rc;
 }
 
