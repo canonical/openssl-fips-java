@@ -22,14 +22,17 @@ md_context *md_init(OSSL_LIB_CTX *libctx, const char *algorithm) {
     EVP_MD *md = EVP_MD_fetch(libctx, algorithm, NULL);
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
     if (!EVP_DigestInit_ex2(ctx, md, NULL)) {
-        EVP_MD_CTX_free(ctx);
-        EVP_MD_free(md);
-        free(new);
-        return NULL;
+        goto error;
     }
     EVP_MD_free(md);
     new->ossl_ctx = ctx;
-    return new; 
+    return new;
+
+error:
+    EVP_MD_CTX_free(ctx);
+    EVP_MD_free(md);
+    free(new);
+    return NULL;
 }
 
 int md_update(md_context *ctx, byte *input, size_t input_length) {

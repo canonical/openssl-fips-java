@@ -86,12 +86,15 @@ cipher_context* create_cipher_context(OSSL_LIB_CTX *libctx, const char *name, co
     new_context->context = new_ctx;
     new_context->cipher = EVP_CIPHER_fetch(libctx, name, NULL);
     if (new_context->cipher == NULL || new_context->context == NULL) {
-        free_cipher(&new_context);
-        return NULL;
+        goto error;
     }
     new_context->padding = get_padding_code(padding_name);
     memset(new_context->gcm_tag, 0, GCM_TAG_LEN);
     return new_context;
+
+error:
+    free_cipher(&new_context);
+    return NULL;
 }
 
 void cipher_init(cipher_context * ctx, byte in_buf[], int in_len, unsigned char *key, unsigned char *iv, int iv_len, int mode) {
@@ -103,6 +106,7 @@ void cipher_init(cipher_context * ctx, byte in_buf[], int in_len, unsigned char 
     }
     if (!EVP_CipherInit_ex(ctx->context, NULL, NULL, key, iv, mode)) {
         ERR_print_errors_fp(stderr);
+        return;
     }
     EVP_CIPHER_CTX_set_padding(ctx->context, ctx->padding);
 }
@@ -132,6 +136,7 @@ void cipher_do_final(cipher_context *ctx, byte *out_buf, int *out_len_ptr) {
 
     if (!EVP_CipherFinal_ex(ctx->context, out_buf, out_len_ptr)) {
         ERR_print_errors_fp(stderr);
+        return;
     }
 
     if (ctx->mode == ENCRYPT) {
