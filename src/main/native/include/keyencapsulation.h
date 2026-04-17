@@ -43,11 +43,13 @@ kem_keyspec *init_kem_keyspec(OSSL_LIB_CTX *libctx);
 
 kem_keyspec *init_kem_keyspec_with_key(EVP_PKEY *rsa_public_key, EVP_PKEY *rsa_private_key, OSSL_LIB_CTX *libctx);
 
-int generate_and_wrap(kem_keyspec *spec);
+jssl_status init_encapsulator(kem_keyspec *spec);
 
-int set_wrapped_key(kem_keyspec *spec, byte *wrapped_key, int length);
+jssl_status generate_and_wrap(kem_keyspec *spec);
 
-int unwrap(kem_keyspec *spec);
+void set_wrapped_key(kem_keyspec *spec, byte *wrapped_key, int length);
+
+jssl_status unwrap(kem_keyspec *spec);
 
 void free_kem_keyspec(kem_keyspec **spec);
 

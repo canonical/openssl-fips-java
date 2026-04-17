@@ -47,16 +47,18 @@ static int create_params(const char *name, OSSL_PARAM params[]) {
     }
     return param_count;
 }
+
 DRBG* create_DRBG(const char* name, DRBG* parent) {
-    return create_DRBG_with_params(name, parent, NULL);
+    return create_DRBG_with_params(name, parent, NULL, NULL);
 }
 
 #define MIN_NUMBER_OF_PARAMS 2
 #define MAX_NUMBER_OF_PARAMS 4
 
-DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_params) {
+DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_params, int *evp_error) {
     EVP_RAND *rand = NULL;
     EVP_RAND_CTX *context = NULL;
+    int rc = 1;
 
     rand = EVP_RAND_fetch(NULL, name, NULL);
     if (NULL == rand) {
@@ -70,7 +72,7 @@ DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_p
         goto error;
     }
 
-    OSSL_PARAM params[MAX_NUMBER_OF_PARAMS];
+    OSSL_PARAM params[MAX_NUMBER_OF_PARAMS] = {0};
     int n_params = create_params(name, params);
     if (n_params < MIN_NUMBER_OF_PARAMS) {
         fprintf(stderr, "Couldn't create params");
@@ -78,22 +80,27 @@ DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_p
     }
 
     if (NULL == drbg_params) {
-        EVP_RAND_instantiate(context, 128, 0, NULL, 0, params);
+        rc = EVP_RAND_instantiate(context, 128, 0, NULL, 0, params);
     } else {
-        EVP_RAND_instantiate(context, drbg_params->strength,
+        rc = EVP_RAND_instantiate(context, drbg_params->strength,
                              drbg_params->prediction_resistance,
                              drbg_params->personalization_str, drbg_params->personalization_str_len, params);
     }
 
+    if (!rc) goto error;
+
     const OSSL_PROVIDER *prov = EVP_RAND_get0_provider(EVP_RAND_CTX_get0_rand(context));
     DRBG *newDRBG = (DRBG*) malloc(sizeof(DRBG));
+    if (newDRBG == NULL) goto error;
+    newDRBG->rand = rand;
     newDRBG->context = context;
     newDRBG->seed = NULL;
-    newDRBG->params = drbg_params; 
+    newDRBG->params = drbg_params;
     newDRBG->parent = parent;
     return newDRBG;
 
 error:
+    if (evp_error) *evp_error = !rc;
     if ( rand != NULL ) {
         EVP_RAND_free(rand);
     }
@@ -107,6 +114,10 @@ void free_DRBGParams(DRBGParams **pparams) {
     if (pparams == NULL || *pparams == NULL) {
         return;
     }
+    if ((*pparams)->additional_data)
+        OPENSSL_cleanse((*pparams)->additional_data, (*pparams)->additional_data_length);
+    if ((*pparams)->personalization_str)
+        OPENSSL_cleanse((*pparams)->personalization_str, (*pparams)->personalization_str_len);
     free((*pparams)->additional_data);
     free((*pparams)->personalization_str);
     free(*pparams);
@@ -119,9 +130,9 @@ void free_DRBG(DRBG **pgenerator) {
         return;
     }
     free_DRBGParams(&((*pgenerator)->params));
-    free_DRBG(&((*pgenerator)->parent));
     free((*pgenerator)->seed);
     EVP_RAND_CTX_free((*pgenerator)->context);
+    EVP_RAND_free((*pgenerator)->rand);
     free(*pgenerator);
     *pgenerator = NULL;
     return;
@@ -139,12 +150,13 @@ int next_rand_with_params(DRBG *drbg, byte output[], int n_bytes, DRBGParams *pa
 
 int next_rand_int(DRBG *drbg, int num_bits) {
     if (num_bits <= 0 || num_bits > 32) {
-        return 0; // can this indicate failure?
+        return -1;
     }
     int num_bytes = num_bits/8 + (num_bits % 8 == 0 ? 0 : 1);
-    int mask = ~(~1 << ((num_bits-1) % 8));
+    int mask = ~(~1u << ((num_bits-1) % 8));
     byte output[4] = {0};
-    next_rand(drbg, output, num_bytes);
+    if (!next_rand(drbg, output, num_bytes))
+        return -1;
     output[num_bytes-1] &= mask;
 
     int32_t target;
@@ -161,21 +173,28 @@ int generate_seed(DRBG* generator, byte output[], int n_bytes) {
     }
 }
 
-void reseed(DRBG* generator) {
+/*void reseed(DRBG* generator) {
     reseed_with_params(generator, &NO_PARAMS);
-}
+}*/
 
-void reseed_with_params(DRBG *generator, DRBGParams *params) {
+jssl_status reseed_with_params(DRBG *generator, DRBGParams *params) {
     byte seed[128]; // TODO: what should the default seed size be?
     size_t length = 128;
-    getrandom(seed, length, 0);
+    ssize_t num = getrandom(seed, length, 0);
+    if (num < length) {
+        return FAIL_GETRANDOM;
+    }
     EVP_RAND_reseed(generator->context, params->prediction_resistance, seed, length, params->additional_data, params->additional_data_length);
+    OPENSSL_cleanse(seed, length);
+    return SUCCESS;
 }
 
 void reseed_with_seed(DRBG* generator, byte seed[], int seed_length) {
     EVP_RAND_reseed(generator->context, 0, seed, seed_length, NULL, 0);
+    OPENSSL_cleanse(seed, seed_length);
 }
 
 void reseed_with_seed_and_params(DRBG* generator, byte seed[], int seed_length, DRBGParams *params) {
     EVP_RAND_reseed(generator->context, params->prediction_resistance, seed, seed_length, params->additional_data, params->additional_data_length);
+    OPENSSL_cleanse(seed, seed_length);
 }

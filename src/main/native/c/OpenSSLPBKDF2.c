@@ -14,9 +14,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include "jni_utils.h" 
+#include "jni_utils.h"
 #include "kdf.h"
 #include "OpenSSLPBKDF2.h"
+#include <openssl/crypto.h>
 
 #define MAX_KEY_SIZE 64
 extern OSSL_LIB_CTX *global_libctx;
@@ -27,22 +28,38 @@ extern OSSL_LIB_CTX *global_libctx;
  */
 JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_kdf_OpenSSLPBKDF2_generateSecret0
   (JNIEnv *env, jobject this, jcharArray password, jbyteArray salt, jint iteration_count) {
-    int password_length = array_length(env, password);
+    int password_length = (*env)->GetArrayLength(env, password);
     int salt_length = array_length(env, salt);
     byte output[MAX_KEY_SIZE] = {0};
+    jbyteArray result = NULL;
 
-    char *password_chars = jcharArray_to_char_array(env, password);
-    byte *salt_bytes = jbyteArray_to_byte_array(env, salt);
+    jchar *password_chars = (*env)->GetCharArrayElements(env, password, NULL);
+    jbyte *salt_bytes = (*env)->GetByteArrayElements(env, salt, NULL);
 
-    kdf_spec *spec = create_pbkdf_spec((byte *)password_chars, password_length,
-                        salt_bytes, salt_length, iteration_count);
-    kdf_params *params = create_pbkdf_params("SHA-512");
+    kdf_spec *spec = create_pbkdf_spec((byte *)password_chars, password_length * sizeof(jchar),
+                        (byte *)salt_bytes, salt_length, iteration_count);
 
-    if (kdf_derive(global_libctx, spec, params, output, MAX_KEY_SIZE, PBKDF2) <= 0) {
-        free_kdf_spec(&spec);
-        free_kdf_params(&params);
-        return NULL; 
+    (*env)->ReleaseCharArrayElements(env, password, password_chars, JNI_ABORT);
+    (*env)->ReleaseByteArrayElements(env, salt, salt_bytes, JNI_ABORT);
+
+    if (spec == NULL) {
+        throwOOM(env, "Failed to allocate PBKDF2 spec");
+        return NULL;
     }
 
-    return byte_array_to_jbyteArray(env, output, MAX_KEY_SIZE);
+    kdf_params *params = create_pbkdf_params("SHA-512");
+    if (params == NULL) {
+        free_kdf_spec(&spec, PBKDF2);
+        throwOOM(env, "Failed to allocate PBKDF2 params");
+        return NULL;
+    }
+
+    if (kdf_derive(global_libctx, spec, params, output, MAX_KEY_SIZE, PBKDF2) == SUCCESS) {
+        result = byte_array_to_jbyteArray(env, output, MAX_KEY_SIZE);
+    }
+
+    OPENSSL_cleanse(output, MAX_KEY_SIZE);
+    free_kdf_spec(&spec, PBKDF2);
+    free_kdf_params(&params, PBKDF2);
+    return result;
 }

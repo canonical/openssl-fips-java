@@ -20,28 +20,33 @@
 #include <openssl/types.h>
 #include <jssl.h>
 
-#define DECRYPT 0
-#define ENCRYPT 1 
+#define OP_UNDEFINED -1
+#define OP_DECRYPT 0
+#define OP_ENCRYPT 1
 #define GCM_TAG_LEN 16
+#define MAX_BLOCK_LENGTH EVP_MAX_BLOCK_LENGTH
 
 typedef struct cipher_context {
     const char *name;
     EVP_CIPHER_CTX *context;
     EVP_CIPHER* cipher;
-    int mode;
+    int op_mode;
     int padding;
     byte gcm_tag[GCM_TAG_LEN];
+    unsigned char *key;
+    unsigned char *iv;
+    byte *initial_bytes; //track here for cleanup
 } cipher_context;
 
 cipher_context* create_cipher_context(OSSL_LIB_CTX *libctx, const char *name, const char *padding_name);
 
-void cipher_init(cipher_context * ctx, byte in[], int in_len, unsigned char *key, unsigned char *iv, int iv_len, int mode);
+jssl_status cipher_init(cipher_context * ctx, byte in[], int in_len, unsigned char *key, int key_len, unsigned char *iv, int iv_len, int op_mode);
 
-void cipher_update_aad(cipher_context *ctx, int *out_len_ptr, byte aad[], int aad_len);
+jssl_status cipher_update_aad(cipher_context *ctx, int *out_len_ptr, byte aad[], int aad_len);
 
-void cipher_update(cipher_context *ctx, byte out[], int *out_len_ptr, byte in[], int in_len);
+jssl_status cipher_update(cipher_context *ctx, byte out[], int *out_len_ptr, byte in[], int in_len);
 
-void cipher_do_final(cipher_context *ctx, byte *out, int *out_len_ptr);
+jssl_status cipher_do_final(cipher_context *ctx, byte *out, int *out_len_ptr);
 
 void free_cipher(cipher_context **ctx);
 #endif //_INCLUDE_CIPHER_H

@@ -24,14 +24,6 @@
 extern OSSL_LIB_CTX *global_libctx;
 
 
-int get_key_type(key_agreement_algorithm algo) {
-    switch(algo) {
-        case DIFFIE_HELLMAN: return EVP_PKEY_DH;
-        case ELLIPTIC_CURVE: return EVP_PKEY_EC;
-        default: return -1;
-    }
-}
-
 /*
  * Class:     OpenSSLKeyAgreementSpi
  * Method:    engineInit0
@@ -41,11 +33,13 @@ JNIEXPORT long JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreeme
   (JNIEnv *env, jobject this, jint algo, jbyteArray keyBytes) {
     key_agreement_algorithm type = algo;
     key_agreement *agreement = init_key_agreement(type, global_libctx);
-    byte* key_bytes = jbyteArray_to_byte_array(env, keyBytes);
-    size_t key_length = array_length(env, keyBytes);
-    EVP_PKEY *private_key = create_private_key(get_key_type(type), key_bytes, key_length);
+    if (agreement == NULL) return 0;
+    jsize key_length = (*env)->GetArrayLength(env, keyBytes);
+    jbyte *key_bytes = (*env)->GetByteArrayElements(env, keyBytes, NULL);
+    EVP_PKEY *private_key = decode_private_key_fips((byte *)key_bytes, key_length, global_libctx);
+    (*env)->ReleaseByteArrayElements(env, keyBytes, key_bytes, JNI_ABORT);
     set_private_key(agreement, private_key);
-    return (long)agreement; 
+    return (long)agreement;
 }
 
 /*
@@ -56,9 +50,10 @@ JNIEXPORT long JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreeme
 JNIEXPORT void JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreement_engineDoPhase0
   (JNIEnv *env, jobject this, jbyteArray keyBytes) {
     key_agreement *agreement = (key_agreement *)get_long_field(env, this, "nativeHandle");
-    byte* key_bytes = jbyteArray_to_byte_array(env, keyBytes);
-    size_t key_length = array_length(env, keyBytes);
-    EVP_PKEY *public_key = create_public_key(key_bytes, key_length);
+    jsize key_length = (*env)->GetArrayLength(env, keyBytes);
+    jbyte *key_bytes = (*env)->GetByteArrayElements(env, keyBytes, NULL);
+    EVP_PKEY *public_key = decode_public_key_fips((byte *)key_bytes, key_length, global_libctx);
+    (*env)->ReleaseByteArrayElements(env, keyBytes, key_bytes, JNI_ABORT);
     set_peer_key(agreement, public_key);
 }
 
@@ -70,9 +65,18 @@ JNIEXPORT void JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreeme
 JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreement_engineGenerateSecret0
   (JNIEnv * env, jobject this) {
     key_agreement *agreement = (key_agreement *)get_long_field(env, this, "nativeHandle");
-    shared_secret *secret = generate_shared_secret(agreement);
+    int evp_error = JNI_FALSE;
+    shared_secret *secret = generate_shared_secret(agreement, &evp_error);
+    if (secret == NULL) {
+        if (evp_error == JNI_TRUE) {
+            throwProviderException(env, "Provider failed to generate a secret");
+	    return NULL;
+   	} else {
+            throwOOM(env, "Failed to allocate memory for secret");
+	    return NULL;
+        }
+    }
     jbyteArray byteArray = byte_array_to_jbyteArray(env, secret->bytes, secret->length);
-    free_shared_secret(&secret);
     return byteArray;
 }
 

@@ -44,10 +44,9 @@ public class KeyAgreementTest {
             bobAgreement.doPhase(aliceKp.getPublic(), true);
             byte[] aliceSecret = aliceAgreement.generateSecret();
             byte[] bobSecret = bobAgreement.generateSecret();
-            assertArrayEquals("Key Agreement test for " + algo +  " failed", aliceSecret, bobSecret);
+            assertArrayEquals("Key Agreement test for " + algo + " failed", aliceSecret, bobSecret);
 
-            // make sure generateSecret() resets the KeyAgreement object
-            // and can be reused for another agreement
+            // make sure init() resets the KeyAgreement object and it can be reused
         }
     }
 

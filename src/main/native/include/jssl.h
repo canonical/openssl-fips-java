@@ -21,6 +21,14 @@
 #include <string.h>
 #include <stdlib.h>
 
+typedef enum {
+    SUCCESS,
+    FAIL_EVP,
+    FAIL_OOM,
+    FAIL_GETRANDOM,
+    FAIL_OPERATION_UNSUPPORTED
+} jssl_status;
+
 OSSL_LIB_CTX* load_openssl_fips_provider(const char*);
 void unload_libctx(OSSL_LIB_CTX *libctx);
 

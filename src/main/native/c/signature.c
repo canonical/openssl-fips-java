@@ -20,18 +20,27 @@
 #include <openssl/rsa.h>
 #include <openssl/core_names.h>
 
-sv_key *sv_init_key(OSSL_LIB_CTX *libctx, EVP_PKEY *pkey) {
+sv_key *sv_init_key(OSSL_LIB_CTX *libctx, EVP_PKEY *pkey, int *oom) {
     sv_key *key = (sv_key*)malloc(sizeof(sv_key));
+    if (key == NULL) {
+        if (oom) *oom = 1;
+        return NULL;
+    }
     key->ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey, NULL);
     if (key->ctx == NULL) {
         ERR_print_errors_fp(stderr);
+        free(key);
         return NULL;
     }
     return key;
 }
   
-sv_params *sv_create_params(OSSL_LIB_CTX *libctx, int salt_length, sv_padding_mode padding, char *digest, char *mgf1_digest) {
+sv_params *sv_create_params(OSSL_LIB_CTX *libctx, int salt_length, sv_padding_mode padding, char *digest, char *mgf1_digest, int *oom) {
     sv_params *params = (sv_params*) malloc(sizeof(sv_params));
+    if (params == NULL) {
+        if (oom) *oom = 1;
+        return NULL;
+    }
     params->padding = padding;
     if (padding == PSS) {
         params->salt_length = salt_length;
@@ -39,13 +48,14 @@ sv_params *sv_create_params(OSSL_LIB_CTX *libctx, int salt_length, sv_padding_mo
         params->salt_length = -1; //ignore
     }
 
-    params->digest_type = digest;
+    params->digest_type = digest != NULL ? strdup(digest) : NULL;
+    params->digest = NULL;
     if (digest != NULL) {
         params->digest = EVP_MD_fetch(libctx, digest, NULL);
     }
 
     if (padding == PSS) {
-        params->mgf1_digest_type = mgf1_digest;
+        params->mgf1_digest_type = mgf1_digest != NULL ? strdup(mgf1_digest) : NULL;
         params->mgf1_digest = EVP_MD_fetch(libctx, mgf1_digest, NULL);
     } else {
         params->mgf1_digest_type = NULL;
@@ -54,7 +64,7 @@ sv_params *sv_create_params(OSSL_LIB_CTX *libctx, int salt_length, sv_padding_mo
     return params;
 }
 
-sv_context *sv_init(OSSL_LIB_CTX *libctx, sv_key *key, sv_params *params, sv_state op, sv_type type) {
+sv_context *sv_init(OSSL_LIB_CTX *libctx, sv_key *key, sv_params *params, sv_state op, sv_type type, int *oom) {
     EVP_MD_CTX *md_ctx = EVP_MD_CTX_new();
     if (md_ctx == NULL) {
         return NULL;
@@ -89,6 +99,10 @@ sv_context *sv_init(OSSL_LIB_CTX *libctx, sv_key *key, sv_params *params, sv_sta
     }
 
     sv_context *new_context = (sv_context*) malloc(sizeof(sv_context));
+    if (new_context == NULL) {
+        if (oom) *oom = 1;
+        goto error;
+    }
     new_context->state = op;
     new_context->type = type;
     new_context->key = key;
@@ -135,15 +149,15 @@ int sv_verify(sv_context *ctx, byte *signature, size_t sig_length) {
 }
 
 void free_sv_params(sv_params **pparams) {
-    // TODO: EVP_MD_free fails
-    /*if (params->digest)
-        EVP_MD_free(params->digest);
-    if (params->mgf1_digest)
-        EVP_MD_free(params->mgf1_digest);
-    */
     if (pparams == NULL || *pparams == NULL) {
         return;
     }
+    free((*pparams)->digest_type);
+    if ((*pparams)->digest)
+        EVP_MD_free((*pparams)->digest);
+    free((*pparams)->mgf1_digest_type);
+    if ((*pparams)->mgf1_digest)
+        EVP_MD_free((*pparams)->mgf1_digest);
     free(*pparams);
     *pparams = NULL;
 }
@@ -162,6 +176,7 @@ void free_sv_context(sv_context **pcontext) {
     if (pcontext == NULL || *pcontext == NULL) {
         return;
     }
+    free_sv_key(&(*pcontext)->key);
     EVP_MD_CTX_free((*pcontext)->mctx);
     free(*pcontext);
     *pcontext = NULL;

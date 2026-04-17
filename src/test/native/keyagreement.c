@@ -38,18 +38,18 @@ int test(key_agreement_algorithm algo, OSSL_LIB_CTX *libctx) {
 
     shared_secret *alice_secret, *bob_secret;
 
-    EVP_PKEY *alice_key = generate_key(algo);
-    EVP_PKEY *bob_key = generate_key(algo);
+    EVP_PKEY *alice_key = generate_key(algo, libctx);
+    EVP_PKEY *bob_key = generate_key(algo, libctx);
 
     key_agreement *alice = init_key_agreement(algo, libctx);
     set_private_key(alice, alice_key);
     set_peer_key(alice, bob_key);
-    alice_secret = generate_shared_secret(alice);
+    alice_secret = generate_shared_secret(alice, NULL);
     
     key_agreement *bob = init_key_agreement(algo, libctx);
     set_private_key(bob, bob_key);
     set_peer_key(bob, alice_key);
-    bob_secret = generate_shared_secret(bob);
+    bob_secret = generate_shared_secret(bob, NULL);
 
     if (compare(alice_secret, bob_secret)) {
         printf(" PASSED\n");
@@ -58,11 +58,10 @@ int test(key_agreement_algorithm algo, OSSL_LIB_CTX *libctx) {
         rc = 1;
     }
 
-    free_shared_secret(&alice_secret);
-    free_shared_secret(&bob_secret);
     free_key_agreement(&alice);
-    //free_key_agreement(bob); // keys are shared, don't free twice
-    free(bob);
+    bob->private_key = NULL;
+    bob->peer_public_key = NULL;
+    free_key_agreement(&bob);
     return rc;
 }
 

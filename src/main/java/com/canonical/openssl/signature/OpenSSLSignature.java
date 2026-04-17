@@ -21,11 +21,13 @@ import com.canonical.openssl.util.NativeMemoryCleaner;
 import com.canonical.openssl.util.NativeLibraryLoader;
 
 import java.lang.ref.Cleaner;
+import java.util.concurrent.atomic.AtomicLong;
 import java.nio.ByteBuffer;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.AlgorithmParameters;
 import java.security.InvalidKeyException;
 import java.security.PrivateKey;
+import java.security.ProviderException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.SignatureException;
@@ -43,15 +45,16 @@ public abstract class OpenSSLSignature extends SignatureSpi {
     }
 
     private static class SignatureState implements Runnable {
-        private long nativeHandle;
+        private final AtomicLong nativeHandle;
 
         SignatureState(long handle) {
-            this.nativeHandle = handle;
+            this.nativeHandle = new AtomicLong(handle);
         }
 
         @Override
         public void run() {
-            cleanupNativeMemory(nativeHandle);
+            long handle = nativeHandle.getAndSet(0);
+            if (handle != 0) cleanupNativeMemory(handle);
         }
     }
     private long nativeHandle = 0L;
@@ -122,6 +125,9 @@ public abstract class OpenSSLSignature extends SignatureSpi {
     @Override
     protected void engineInitSign(PrivateKey key) throws InvalidKeyException {
        if (key instanceof OpenSSLPrivateKey privKey) {
+           if (cleanable != null) {
+               cleanable.clean();
+           }
            nativeHandle = engineInitSign0(getSignatureName(), privKey, params);
            cleanable = cleaner.register(this, new SignatureState(nativeHandle));
        } else {
@@ -138,6 +144,9 @@ public abstract class OpenSSLSignature extends SignatureSpi {
     @Override
     protected void engineInitVerify(PublicKey key) throws InvalidKeyException {
         if (key instanceof OpenSSLPublicKey pubKey) {
+            if (cleanable != null) {
+                cleanable.clean();
+            }
             nativeHandle = engineInitVerify0(getSignatureName(), pubKey, params);
             cleanable = cleaner.register(this, new SignatureState(nativeHandle));
         } else {
@@ -163,11 +172,13 @@ public abstract class OpenSSLSignature extends SignatureSpi {
     }
 
     @Override
-    protected int engineSign(byte[] outbuf, int offset, int len) {
+    protected int engineSign(byte[] outbuf, int offset, int len) throws SignatureException {
         byte[] sign = engineSign();
-        int copyLength = len < sign.length ? len : sign.length;
-        System.arraycopy(sign, 0, outbuf, offset, copyLength);
-        return copyLength; 
+        if (len < sign.length) {
+            throw new SignatureException("Output buffer too small: need " + sign.length + " bytes, got " + len);
+        }
+        System.arraycopy(sign, 0, outbuf, offset, sign.length);
+        return sign.length;
     }
 
     @Override
@@ -182,12 +193,20 @@ public abstract class OpenSSLSignature extends SignatureSpi {
 
     @Override
     protected void engineUpdate(ByteBuffer input) {
-        byte[] array = input.array();
+        if (!input.hasRemaining()) {
+            return;
+        }
         try {
-            engineUpdate(array, 0, array.length);
+            if (input.hasArray()) {
+                engineUpdate(input.array(), input.arrayOffset() + input.position(), input.remaining());
+                input.position(input.limit());
+            } else {
+                byte[] tmp = new byte[input.remaining()];
+                input.get(tmp);
+                engineUpdate(tmp, 0, tmp.length);
+            }
         } catch (SignatureException se) {
-            System.out.println("[WARNING] engineUpdate(ByteBuffer) failed with " + se);
-            se.printStackTrace();
+            throw new ProviderException("engineUpdate(ByteBuffer) failed", se);
         }
     }
 

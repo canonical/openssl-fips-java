@@ -38,19 +38,22 @@ int main(int argc, char ** argv) {
 
     // Alice creates a KEM key specification
     kem_keyspec *spec_alice = init_kem_keyspec(libctx); 
-
+    if (spec_alice == NULL) {
+        printf("FAILED\n");
+        return 1;
+    }
     // Alice sends the public key to Bob
     // Bob generates and encapsulates a secret key using the public key
     kem_keyspec *spec_bob = init_kem_keyspec_with_key(spec_alice->public_key, NULL, libctx);
     if (generate_and_wrap(spec_bob)) {
+        printf("FAILED\n");
         return 1;
     }
     // Bob sends the wrapped key to Alice
     // Alice uses her private key to decapsulate the secret key
-    //spec_alice->wrapped_key = spec_bob->wrapped_key;
-    //spec_alice->wrapped_key_length = spec_bob->wrapped_key_length;
     set_wrapped_key(spec_alice, spec_bob->wrapped_key, spec_bob->wrapped_key_length);
     if (unwrap(spec_alice)) {
+        printf("FAILED\n");
         return 1;
     }
 

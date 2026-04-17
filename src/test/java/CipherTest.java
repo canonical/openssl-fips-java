@@ -204,9 +204,8 @@ public class CipherTest {
         if (nameKeySizeAndMode.endsWith("CCM") || nameKeySizeAndMode.endsWith("GCM")) {
             decipher.updateAAD(aad.getBytes(), 0, aad.length());
         }
-
+	
         byte[] output = decipher.doFinal(outFinal, 0, outFinal.length);
-
         assertArrayEquals("Single update cipher test for " + cipherName + " failed",  input, output);
     }
 
@@ -247,8 +246,8 @@ public class CipherTest {
         System.arraycopy(input, 0, fullInput, 0, inputSize);
         System.arraycopy(input, 0, fullInput, inputSize, inputSize);
 
-        byte[] fullEnc = new byte[cipher.getOutputSize(inputSize*2)];
-        int encLen = 0;
+	byte[] fullEnc = new byte[cipher.getOutputSize(inputSize*2)];
+	int encLen = 0;
 
         byte[] enc1 = cipher.update(input, 0, input.length);
         System.arraycopy(enc1, 0, fullEnc, 0, enc1.length);

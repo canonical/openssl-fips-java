@@ -15,7 +15,20 @@
  *
  */
 #include <jni.h>
+#include <stdio.h>
 #include "jssl.h"
+
+void throwOOM(JNIEnv *env, const char *message) {
+    (*env)->ThrowNew(env,
+        (*env)->FindClass(env, "java/lang/OutOfMemoryError"),
+        message);
+}
+
+void throwProviderException(JNIEnv *env, const char *message) {
+    (*env)->ThrowNew(env,
+        (*env)->FindClass(env, "java/security/ProviderException"),
+        message);
+}
 
 char *jstring_to_char_array(JNIEnv *env, jstring string) {
     if (string == NULL) {
@@ -27,6 +40,12 @@ char *jstring_to_char_array(JNIEnv *env, jstring string) {
 void release_jstring(JNIEnv *env, jstring string, const char *chars) {
     if (string != NULL && chars != NULL) {
         (*env)->ReleaseStringUTFChars(env, string, chars);
+    }
+}
+
+void release_jbyteArray(JNIEnv *env, jbyteArray array, byte *elems) {
+    if (array != NULL && elems != NULL) {
+        (*env)->ReleaseByteArrayElements(env, array, (jbyte *)elems, JNI_ABORT);
     }
 }
 
@@ -45,6 +64,7 @@ char *jcharArray_to_char_array(JNIEnv *env, jcharArray chars) {
 
 jbyteArray byte_array_to_jbyteArray(JNIEnv *env, byte *array, int length) {
     jbyteArray ret_array = (*env)->NewByteArray(env, length);
+    if (ret_array == NULL) return NULL;
     (*env)->SetByteArrayRegion(env, ret_array, 0, length, array);
     return ret_array;
 }
@@ -58,18 +78,30 @@ int array_length(JNIEnv *env, jbyteArray array) {
 long get_long_field(JNIEnv *env, jobject this, const char *field_name) {
     jclass clazz = (*env)->GetObjectClass(env, this);
     jfieldID ctx_id = (*env)->GetFieldID(env, clazz, field_name, "J");
+    if (ctx_id == NULL) {
+        fprintf(stderr, "JNI: field '%s' (J) not found\n", field_name);
+        return 0;
+    }
     return (*env)->GetLongField(env, this, ctx_id);
 }
 
 int get_int_field(JNIEnv *env, jobject this, const char *field_name) {
     jclass clazz = (*env)->GetObjectClass(env, this);
     jfieldID id = (*env)->GetFieldID(env, clazz, field_name, "I");
+    if (id == NULL) {
+        fprintf(stderr, "JNI: field '%s' (I) not found\n", field_name);
+        return 0;
+    }
     return (*env)->GetIntField(env, this, id);
 }
 
 jstring get_string_field(JNIEnv *env, jobject this, const char *field_name) {
     jclass clazz = (*env)->GetObjectClass(env, this);
     jfieldID id = (*env)->GetFieldID(env, clazz, field_name, "Ljava/lang/String;");
+    if (id == NULL) {
+        fprintf(stderr, "JNI: field '%s' (Ljava/lang/String;) not found\n", field_name);
+        return NULL;
+    }
     return (jstring)((*env)->GetObjectField(env, this, id));
 }
 
@@ -83,6 +115,7 @@ void copy_byte_array_range(JNIEnv *env, jbyteArray source, int offset, int lengt
 
 jbyteArray new_byteArray(JNIEnv *env, byte *source, int length) {
     jbyteArray retArray = (*env)->NewByteArray(env, length);
+    if (retArray == NULL) return NULL;
     (*env)->SetByteArrayRegion(env, retArray, 0, length, source);
     return retArray;
 }
@@ -90,5 +123,9 @@ jbyteArray new_byteArray(JNIEnv *env, byte *source, int length) {
 jlong invokeLongMethod(JNIEnv *env, jobject this, const char *name, const char *signature) {
     jclass class = (*env)->GetObjectClass(env, this);
     jmethodID methodID = (*env)->GetMethodID(env, class, name, signature);
+    if (methodID == NULL) {
+        fprintf(stderr, "JNI: method '%s%s' not found\n", name, signature);
+        return 0;
+    }
     return (*env)->CallLongMethod(env, this, methodID);
 }

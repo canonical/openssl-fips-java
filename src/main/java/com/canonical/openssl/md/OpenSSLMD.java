@@ -20,12 +20,11 @@ import com.canonical.openssl.util.NativeMemoryCleaner;
 import com.canonical.openssl.util.NativeLibraryLoader;
 
 import java.lang.ref.Cleaner;
+import java.util.concurrent.atomic.AtomicLong;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigestSpi;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-import java.util.Set;
 
 /* This implementation will be exercised by the user through the
  * java.security.MessageDigest API which isn't marked thread-safe.
@@ -39,15 +38,16 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
     }
 
     private static class MDState implements Runnable {
-        private long nativeHandle;
+        private final AtomicLong nativeHandle;
 
         MDState(long handle) {
-            this.nativeHandle = handle;
+            this.nativeHandle = new AtomicLong(handle);
         }
 
         @Override
         public void run() {
-            cleanupNativeMemory(nativeHandle);
+            long handle = nativeHandle.getAndSet(0);
+            if (handle != 0) cleanupNativeMemory(handle);
         }
     }
 
@@ -62,9 +62,18 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
         this.mdName = algorithm;
     }
 
+    private void ensureInitialized() {
+        if (!initialized) {
+            nativeHandle = doInit0(mdName);
+            cleanable = cleaner.register(this, new MDState(nativeHandle));
+            initialized = true;
+        }
+    }
+
     @Override
     protected byte[] engineDigest() {
-       return doFinal0();
+        ensureInitialized();
+        return doFinal0();
     }
 
     @Override
@@ -73,16 +82,20 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
         if (len < digest.length) {
             throw new DigestException("Digest length = " + digest.length  + " is greater than len = " + len);
         }
-        System.arraycopy(digest, 0, buf, offset, len);
-        return len;
+        System.arraycopy(digest, 0, buf, offset, digest.length);
+        return digest.length;
     }
 
     abstract protected int engineGetDigestLength();
 
     @Override
     protected void engineReset() {
+        if (cleanable != null) {
+            cleanable.clean();
+        }
         nativeHandle = doInit0(mdName);
         cleanable = cleaner.register(this, new MDState(nativeHandle));
+        initialized = true;
     }
 
     @Override
@@ -92,7 +105,7 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
     
     @Override
     protected void engineUpdate(byte []input, int offset, int len) {
-        engineUpdate(Arrays.copyOfRange(input, offset, len));
+        engineUpdate(Arrays.copyOfRange(input, offset, offset + len));
     }
 
     @Override
@@ -101,13 +114,7 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
     }
 
     private void engineUpdate(byte[] data) {
-        synchronized(this) {
-           if (!this.initialized) {
-               nativeHandle = doInit0(mdName);
-               cleanable = cleaner.register(this, new MDState(nativeHandle));
-               this.initialized = true;
-           }
-        }
+        ensureInitialized();
         doUpdate0(data);
     }
 

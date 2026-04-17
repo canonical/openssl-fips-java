@@ -18,6 +18,7 @@
 #include "mac.h"
 #include "OpenSSLMAC.h"
 #include "jni_utils.h"
+#include <openssl/crypto.h>
 
 #define MAX_OUTPUT_LEN 512
 
@@ -30,12 +31,45 @@
  */
 JNIEXPORT jlong JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doInit0
     (JNIEnv *env, jobject this, jstring name, jstring cipher, jstring digest, jbyteArray iv, jint output_length, jbyteArray key) {
-    mac_params *params = init_mac_params(jstring_to_char_array(env, cipher),
-                                        jstring_to_char_array(env, digest),
-                                        jbyteArray_to_byte_array(env, iv), array_length(env, iv),
-                                        (size_t)output_length);
-    mac_context *ctx = mac_init(jstring_to_char_array(env, name), jbyteArray_to_byte_array(env, key), array_length(env, key), params);
-    return (jlong)ctx;                              
+    const char *name_str   = jstring_to_char_array(env, name);
+    const char *cipher_str = jstring_to_char_array(env, cipher);
+    const char *digest_str = jstring_to_char_array(env, digest);
+    byte       *iv_bytes   = jbyteArray_to_byte_array(env, iv);
+    int         iv_len     = array_length(env, iv);
+    byte       *key_bytes  = jbyteArray_to_byte_array(env, key);
+    int         key_len    = array_length(env, key);
+
+    mac_params *params = init_mac_params((char *)cipher_str, (char *)digest_str,
+                                         iv_bytes, iv_len, (size_t)output_length);
+    int oom = 0;
+    mac_context *ctx = mac_init((char *)name_str, key_bytes, key_len, params, &oom);
+    free(params);
+
+    if (key_bytes) {
+        OPENSSL_cleanse(key_bytes, key_len);
+        (*env)->ReleaseByteArrayElements(env, key, (jbyte *)key_bytes, JNI_ABORT);
+    }
+    if (iv_bytes) {
+        OPENSSL_cleanse(iv_bytes,  iv_len);
+        (*env)->ReleaseByteArrayElements(env, iv,  (jbyte *)iv_bytes,  JNI_ABORT);
+    }
+    if (name_str)
+        (*env)->ReleaseStringUTFChars(env, name,   name_str);
+
+    if (cipher_str)
+        (*env)->ReleaseStringUTFChars(env, cipher, cipher_str);
+
+    if (digest_str)
+        (*env)->ReleaseStringUTFChars(env, digest, digest_str);
+
+    if (ctx == NULL) {
+        if (oom)
+            throwOOM(env, "Out of memory initializing MAC");
+        else
+            throwProviderException(env, "Failed to initialize MAC");
+        return 0;
+    }
+    return (jlong)ctx;
 }
 
 /*
@@ -57,7 +91,13 @@ JNIEXPORT jint JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_getMacLength
 JNIEXPORT void JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doUpdate0
     (JNIEnv *env, jobject this, jbyteArray input) {
     mac_context *ctx = (mac_context*)get_long_field(env, this, "nativeHandle");
-    mac_update(ctx, jbyteArray_to_byte_array(env, input), array_length(env, input));
+    byte *input_bytes = jbyteArray_to_byte_array(env, input);
+    int input_len = array_length(env, input);
+    jssl_status rc = mac_update(ctx, input_bytes, input_len);
+    (*env)->ReleaseByteArrayElements(env, input, (jbyte *)input_bytes, JNI_ABORT);
+    if (rc != SUCCESS) {
+        throwProviderException(env, "MAC update failed");
+    }
 }
 
 /*
@@ -71,9 +111,15 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doFinal0
     size_t output_length = 0; 
 
     mac_context *ctx = (mac_context*)get_long_field(env, this, "nativeHandle");
-    mac_final(ctx, output, &output_length, MAX_OUTPUT_LEN);
+    if (mac_final(ctx, output, &output_length, MAX_OUTPUT_LEN) != SUCCESS) {
+        OPENSSL_cleanse(output, MAX_OUTPUT_LEN);
+        throwProviderException(env, "MAC final failed");
+        return NULL;
+    }
 
-    return byte_array_to_jbyteArray(env, output, output_length);
+    jbyteArray result = byte_array_to_jbyteArray(env, output, output_length);
+    OPENSSL_cleanse(output, output_length);
+    return result;
 }
 
 /*
@@ -83,5 +129,6 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doFinal0
  */
 JNIEXPORT void JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_mac_context((mac_context**) &handle);
+    mac_context *ctx = (mac_context*)handle;
+    free_mac_context(&ctx);
 }

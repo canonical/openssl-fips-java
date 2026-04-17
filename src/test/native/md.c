@@ -36,23 +36,23 @@ void test_digest(const char *algo, OSSL_LIB_CTX *libctx) {
     int len1 = 0, len2 = 0;
 
     printf("Test MessageDigest of type %s: ", algo); 
-    md_context *ctx = md_init(libctx, algo);
+    md_context *ctx = md_init(libctx, algo, NULL);
 
     if (ctx == NULL) {
-        free_md_context(&ctx);
         printf("FAILED (init)\n");
         rc = 1;
+        return;
     }
 
-    if (!(md_update(ctx, message1, strlen(message1)) &&
-        md_update(ctx, message2, strlen(message2)))) {
+    if (md_update(ctx, message1, strlen(message1)) != SUCCESS ||
+        md_update(ctx, message2, strlen(message2)) != SUCCESS) {
         free_md_context(&ctx);
         printf("FAILED (update)\n");
         rc = 1;
         return;
     }
 
-    if (!md_digest(ctx, output1, &len1)) {
+    if (md_digest(ctx, output1, &len1) != SUCCESS) {
         free_md_context(&ctx);
         printf("FAILED (digest)\n");
         rc = 1;
@@ -60,16 +60,16 @@ void test_digest(const char *algo, OSSL_LIB_CTX *libctx) {
     }
     free_md_context(&ctx);
 
-    md_context *ctx1 = md_init(libctx, algo);
-    if (!(md_update(ctx1, message1, strlen(message1)) &&
-        md_update(ctx1, message3, strlen(message3)))) {
+    md_context *ctx1 = md_init(libctx, algo, NULL);
+    if (md_update(ctx1, message1, strlen(message1)) != SUCCESS ||
+        md_update(ctx1, message3, strlen(message3)) != SUCCESS) {
         free_md_context(&ctx1);
         printf("FAILED (update)\n");
         rc = 1;
-        return;   
+        return;
     }
 
-    if (!md_digest(ctx1, output2, &len2)) {
+    if (md_digest(ctx1, output2, &len2) != SUCCESS) {
         free_md_context(&ctx1);
         printf("FAILED (digest)\n");
         rc = 1;

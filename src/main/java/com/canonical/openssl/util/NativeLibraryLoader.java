@@ -24,7 +24,7 @@ import java.io.InputStream;
 public class NativeLibraryLoader {
     static String libFileName = "libjssl.so";
     static String location = "/resources/native/";
-    static boolean loaded = false;
+    static volatile boolean loaded = false;
 
     public static synchronized void load() {
         if (loaded)
