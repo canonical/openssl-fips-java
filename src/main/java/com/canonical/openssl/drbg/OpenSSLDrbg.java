@@ -19,6 +19,9 @@ package com.canonical.openssl.drbg;
 import com.canonical.openssl.util.NativeMemoryCleaner;
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.Arrays;
+import java.security.ProviderException;
 import java.security.SecureRandomSpi;
 import java.security.SecureRandomParameters;
 import java.security.DrbgParameters;
@@ -39,29 +42,25 @@ public class OpenSSLDrbg extends SecureRandomSpi {
     SecureRandomParameters params;
 
     private static class NativeDRBG implements Runnable {
-        private long nativeHandle;
+        private final AtomicLong nativeHandle;
 
         NativeDRBG(long handle) {
-            this.nativeHandle = handle;
+            this.nativeHandle = new AtomicLong(handle);
         }
 
         @Override
         public void run() {
-            cleanupNativeMemory(nativeHandle);
+            long handle = nativeHandle.getAndSet(0);
+	    if (handle != 0) {
+                cleanupNativeMemory(handle);
+	    }
         }
     }
 
     private Cleaner cleaner = NativeMemoryCleaner.cleaner;
     private Cleaner.Cleanable cleanable;
 
-    // mutex lock for nextBytes(), borrowed from openjdk's NativePRNG
-    private final Object LOCK_GET_BYTES = new Object();
-
-    // mutex lock for generateSeed(), borrowed from openjdk's NativePRNG
-    private final Object LOCK_GET_SEED = new Object();
-
-    // mutex lock for setSeed(), borrowed from openjdk's NativePRNG
-    private final Object LOCK_SET_SEED = new Object();
+    private final Object LOCK = new Object();
 
     private OpenSSLDrbg() { }
 
@@ -97,20 +96,29 @@ public class OpenSSLDrbg extends SecureRandomSpi {
 
     @Override
     protected byte[] engineGenerateSeed(int numBytes) {
-	synchronized (LOCK_GET_SEED) {
+        if (numBytes < 0) {
+            throw new IllegalArgumentException("The number of seed bytes are negative");
+        }
+        if (!isInitialized()) {
+            throw new ProviderException("DRBG not initialized");
+        }
+        synchronized (LOCK) {
             return generateSeed0(numBytes);
         }
     }
 
     @Override
     protected void engineNextBytes(byte[] bytes) {
-        synchronized (LOCK_GET_BYTES) {
+        if (!isInitialized()) {
+            throw new ProviderException("DRBG not initialized");
+        }
+        synchronized (LOCK) {
             nextBytes0(bytes, DEFAULT_STRENGTH, false, null);
         }
     }
 
     protected void engineNextBytes(byte[] bytes, SecureRandomParameters params) throws IllegalArgumentException {
-        synchronized (LOCK_GET_BYTES) {
+        synchronized (LOCK) {
             if (params == null) {
                 engineNextBytes(bytes);
                 return;
@@ -126,14 +134,17 @@ public class OpenSSLDrbg extends SecureRandomSpi {
     }
 
     protected void engineReseed() {
-        synchronized (LOCK_SET_SEED) {
+        if (!isInitialized()) {
+            throw new ProviderException("DRBG not initialized");
+        }
+        synchronized (LOCK) {
             reseed0(null, false, null);
         }
     }
 
     @Override
     protected void engineReseed(SecureRandomParameters params) throws IllegalArgumentException {
-        synchronized (LOCK_SET_SEED) {
+        synchronized (LOCK) {
             if (params == null) {
                 engineReseed();
                 return;
@@ -148,20 +159,23 @@ public class OpenSSLDrbg extends SecureRandomSpi {
     }
 
     protected void engineSetSeed(byte[] seed) {
-        synchronized (LOCK_SET_SEED) {
+        synchronized (LOCK) {
             reseed0(seed, false, null);
         }
     }
 
     protected void engineSetSeed(long seed) {
-        synchronized (LOCK_SET_SEED) {
-            byte [] seedBytes = new byte[8];
-            for (int i = 0; i < 8; i++) {
-                seedBytes[i] = (byte)(seed & (long)0xff);
-                seed = seed >> 8;
+        synchronized (LOCK) {
+            byte[] seedBytes = new byte[8];
+            try {
+                for (int i = 0; i < 8; i++) {
+                    seedBytes[i] = (byte)(seed & (long)0xff);
+                    seed = seed >> 8;
+                }
+                engineSetSeed(seedBytes);
+            } finally {
+                Arrays.fill(seedBytes, (byte)0);
             }
-
-            engineSetSeed(seedBytes);
         }
     }
 

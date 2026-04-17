@@ -57,6 +57,9 @@ base = base_sect
 
 [algorithm_sect]
 default_properties = fips=yes
+
+[base_sect]
+activate = 1
 ```
 #### Install OpenJDK v17
 This project needs OpenJDK 17 or a later release of it. On Ubuntu/Debian systems, you may install the OpenJDK from the archive.

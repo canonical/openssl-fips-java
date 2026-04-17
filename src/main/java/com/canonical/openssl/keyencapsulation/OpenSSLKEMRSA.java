@@ -19,6 +19,7 @@ package com.canonical.openssl.keyencapsulation;
 import com.canonical.openssl.util.NativeMemoryCleaner;
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.crypto.DecapsulateException;
 import javax.crypto.KEM;
 import javax.crypto.KEMSpi;
@@ -31,6 +32,7 @@ import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Arrays;
 import javax.crypto.spec.SecretKeySpec;
 
 /* This implementation will be exercised by the user through the
@@ -73,24 +75,32 @@ final public class OpenSSLKEMRSA implements KEMSpi {
         long nativeHandle = 0;
 
         private static class EncapsulatorState implements Runnable {
-            private long nativeHandle;
+            private final AtomicLong nativeHandle;
 
             EncapsulatorState(long handle) {
-                this.nativeHandle = handle;
+                this.nativeHandle = new AtomicLong(handle);
             }
 
             @Override
             public void run() {
-                cleanupNativeMemory(nativeHandle);
+                long handle = nativeHandle.getAndSet(0);
+                if (handle != 0) cleanupNativeMemory(handle);
             }
         }
 
         private static Cleaner cleaner = NativeMemoryCleaner.cleaner;
         private final Cleaner.Cleanable cleanable;
 
-        public RSAKEMEncapsulator(PublicKey key) {
-            nativeHandle = encapsulatorInit0(key.getEncoded());
+        public RSAKEMEncapsulator(PublicKey key) throws InvalidKeyException {
+            byte[] encoded = key.getEncoded();
+            if (encoded == null) {
+                throw new InvalidKeyException("Key does not support encoding");
+            }
+            nativeHandle = encapsulatorInit0(encoded);
             cleanable = cleaner.register(this, new EncapsulatorState(nativeHandle));
+            if (nativeHandle == 0) {
+                throw new InvalidKeyException("Failed to initialize RSA-KEM encapsulator");
+            }
         }
 
         public KEM.Encapsulated engineEncapsulate(int from, int to, String algorithm) {
@@ -102,8 +112,12 @@ final public class OpenSSLKEMRSA implements KEMSpi {
             byte[] encapsulatedBytes = new byte[encapsulationSize];
 
             engineEncapsulate0(secretBytes, encapsulatedBytes);
-            SecretKey secretKey = new SecretKeySpec(secretBytes, algorithm);
-            return new KEM.Encapsulated(secretKey, encapsulatedBytes, null);
+            try {
+                SecretKey secretKey = new SecretKeySpec(secretBytes, algorithm);
+                return new KEM.Encapsulated(secretKey, encapsulatedBytes, null);
+            } finally {
+                Arrays.fill(secretBytes, (byte)0);
+            }
         }
 
         public int engineSecretSize() {
@@ -129,30 +143,42 @@ final public class OpenSSLKEMRSA implements KEMSpi {
         long nativeHandle = 0;
 
         private static class DecapsulatorState implements Runnable {
-            private long nativeHandle;
+            private final AtomicLong nativeHandle;
 
             DecapsulatorState(long handle) {
-                this.nativeHandle = handle;
+                this.nativeHandle = new AtomicLong(handle);
             }
 
             @Override
             public void run() {
-                cleanupNativeMemory(nativeHandle);
+                long handle = nativeHandle.getAndSet(0);
+                if (handle != 0) cleanupNativeMemory(handle);
             }
         }
 
         private static Cleaner cleaner = NativeMemoryCleaner.cleaner;
         private final Cleaner.Cleanable cleanable;
 
-        public RSAKEMDecapsulator(PrivateKey key) {
-            nativeHandle = decapsulatorInit0(key.getEncoded());
+        public RSAKEMDecapsulator(PrivateKey key) throws InvalidKeyException {
+            byte[] encoded = key.getEncoded();
+            if (encoded == null) {
+                throw new InvalidKeyException("Key does not support encoding");
+            }
+            nativeHandle = decapsulatorInit0(encoded);
             cleanable = cleaner.register(this, new DecapsulatorState(nativeHandle));
+            if (nativeHandle == 0) {
+                throw new InvalidKeyException("Failed to initialize RSA-KEM decapsulator");
+            }
         }
 
         public SecretKey engineDecapsulate(byte[] encapsulation, int from, int to, String algorithm)
                 throws DecapsulateException {
             byte[] secretBytes = engineDecapsulate0(encapsulation);
-            return new SecretKeySpec(secretBytes, algorithm);
+            try {
+                return new SecretKeySpec(secretBytes, algorithm);
+            } finally {
+                Arrays.fill(secretBytes, (byte)0);
+            }
         }
 
         public int engineSecretSize() {

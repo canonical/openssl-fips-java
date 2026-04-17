@@ -19,6 +19,7 @@ package com.canonical.openssl.mac;
 import com.canonical.openssl.util.NativeMemoryCleaner;
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
+import java.util.concurrent.atomic.AtomicLong;
 import java.nio.ByteBuffer;
 import java.security.Key;
 import java.util.Arrays;
@@ -40,15 +41,28 @@ public abstract class OpenSSLMAC extends MacSpi {
 
 
     private static class MACState implements Runnable {
-        private long nativeHandle;
+        private final AtomicLong nativeHandle;
+        private volatile byte[] keyBytes;
 
         MACState(long handle) {
-            this.nativeHandle = handle;
+            this.nativeHandle = new AtomicLong(handle);
+        }
+
+        void setKeyBytes(byte[] keyBytes) {
+            this.keyBytes = keyBytes;
         }
 
         @Override
         public void run() {
-            cleanupNativeMemory(nativeHandle);
+            long handle = nativeHandle.getAndSet(0);
+            if (handle != 0) {
+                cleanupNativeMemory(handle);
+            }
+            byte[] local = keyBytes;
+            if (local != null) {
+                Arrays.fill(local, (byte)0);
+                this.keyBytes = null;
+            }
         }
     }
 
@@ -63,9 +77,10 @@ public abstract class OpenSSLMAC extends MacSpi {
     protected abstract byte[] getIV();
 
     private static Cleaner cleaner = NativeMemoryCleaner.cleaner;
+    private MACState macState;
     private Cleaner.Cleanable cleanable;
     private int outputLength = -1;
-    private Key key;
+    private byte[] keyBytes;
 
     @Override
     protected byte[] engineDoFinal() {
@@ -79,18 +94,32 @@ public abstract class OpenSSLMAC extends MacSpi {
 
     @Override
     protected void engineInit(Key key, AlgorithmParameterSpec spec) {
-        this.key = key;
         if (spec != null && isHMAC(this) && spec instanceof HMACParameterSpec hmacSpec) {
             this.outputLength = hmacSpec.getOutputLength();
         }
-        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), getIV(), outputLength, key.getEncoded());
-        cleanable = cleaner.register(this, new MACState(nativeHandle));
+        byte[] newKeyBytes = key.getEncoded();
+        // clean() zeros the old keyBytes array (held by the old MACState) and frees the old handle
+        if (cleanable != null) {
+            cleanable.clean();
+        }
+        this.keyBytes = newKeyBytes;
+        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), getIV(), outputLength, keyBytes);
+        macState = new MACState(nativeHandle);
+        macState.setKeyBytes(keyBytes);
+        cleanable = cleaner.register(this, macState);
     }
 
     @Override
     protected void engineReset() {
-        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), getIV(), this.outputLength, this.key.getEncoded());
-        cleanable = cleaner.register(this, new MACState(nativeHandle));
+        if (cleanable != null) {
+            // Suppress keyBytes zeroing: we still need them for the doInit0 call below
+            macState.setKeyBytes(null);
+            cleanable.clean();
+        }
+        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), getIV(), this.outputLength, keyBytes);
+        macState = new MACState(nativeHandle);
+        macState.setKeyBytes(keyBytes);
+        cleanable = cleaner.register(this, macState);
     }
 
     @Override
@@ -100,7 +129,7 @@ public abstract class OpenSSLMAC extends MacSpi {
 
     @Override
     protected void engineUpdate(byte[] input, int offset, int length) {
-        engineUpdate(Arrays.copyOfRange(input, offset, length));
+        engineUpdate(Arrays.copyOfRange(input, offset, offset + length));
     }
 
     @Override

@@ -40,6 +40,8 @@ typedef struct DRBGParams {
 /* Group everything related to an EVP_RAND into this struct */ 
 typedef struct _DRBG {
     byte* seed;
+    size_t seed_length;
+    EVP_RAND *rand;
     EVP_RAND_CTX* context;
     DRBGParams *params;
     struct _DRBG* parent;
@@ -48,7 +50,7 @@ typedef struct _DRBG {
 /* Fetch and initialize a DRBG instance */
 DRBG* create_DRBG(const char* name, DRBG* parent);
 
-DRBG* create_DRBG_with_params(const char *name, DRBG *parent, DRBGParams *params);
+DRBG* create_DRBG_with_params(const char *name, DRBG *parent, DRBGParams *params, int *evp_error);
 
 /* Destroy the given DRBG */
 void free_DRBG(DRBG **generator);
@@ -65,9 +67,7 @@ int generate_seed(DRBG* generator, byte output[], int n_bytes);
  * underlying entropy source
  */
 
-void reseed(DRBG* generator);
-
-void reseed_with_params(DRBG *generator, DRBGParams *params);
+jssl_status reseed_with_params(DRBG *generator, DRBGParams *params);
 
 void reseed_with_seed(DRBG* generator, byte seed[], int seed_length);
 

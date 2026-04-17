@@ -19,11 +19,16 @@ package com.canonical.openssl.keyagreement;
 import com.canonical.openssl.util.NativeMemoryCleaner;
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
+import java.util.concurrent.atomic.AtomicLong;
+import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
+import java.util.Arrays;
 import javax.crypto.KeyAgreementSpi;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 /* This implementation will be exercised by the user through the
  * javax.crypto.KeyAgreement API which isn't marked thread-safe.
@@ -45,15 +50,16 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
     private long nativeHandle = 0;
 
     private static class KeyAgreementState implements Runnable {
-        private long nativeHandle;
+        private final AtomicLong nativeHandle;
 
         KeyAgreementState(long handle) {
-            this.nativeHandle = handle;
+            this.nativeHandle = new AtomicLong(handle);
         }
 
         @Override
         public void run() {
-            cleanupNativeMemory(nativeHandle);
+            long handle = nativeHandle.getAndSet(0);
+            if (handle != 0) cleanupNativeMemory(handle);
         }
     }
 
@@ -64,7 +70,11 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
         if (state == State.UNINITIALIZED) {
             throw new IllegalStateException("The KeyAgreement is not initialized yet");
         }
-        engineDoPhase0(key.getEncoded());
+        byte[] encoded = key.getEncoded();
+        if (encoded == null) {
+            throw new IllegalArgumentException("Key does not support encoding");
+        }
+        engineDoPhase0(encoded);
         state = State.PEER_KEY_ADDED;
         return null;
     }
@@ -81,8 +91,13 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
         return secret.length;
     }
 
-    protected SecretKey engineGenerateSecret(String algorithm) {
-        return null;
+    protected SecretKey engineGenerateSecret(String algorithm) throws NoSuchAlgorithmException, InvalidKeyException {
+        byte[] secret = engineGenerateSecret();
+        try {
+            return new SecretKeySpec(secret, algorithm);
+        } finally {
+            Arrays.fill(secret, (byte)0);
+        }
     }
 
     protected void engineInit(Key key, AlgorithmParameterSpec params, SecureRandom random) {
@@ -91,8 +106,12 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
     }
 
     protected void engineInit(Key key, SecureRandom random) {
+	// This is needed if the KeyAgreement is reused.
+        if (cleanable != null) {
+            cleanable.clean();
+        }
         nativeHandle = initialize(key);
-        cleanable = cleaner.register(this, new KeyAgreementState(nativeHandle)); 
+        cleanable = cleaner.register(this, new KeyAgreementState(nativeHandle));
         state = State.INITIALIZED;
     }
 

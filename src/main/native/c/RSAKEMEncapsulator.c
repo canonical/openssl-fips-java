@@ -32,8 +32,22 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRS
   (JNIEnv *env, jobject this, jbyteArray key) {
     byte* bytes = jbyteArray_to_byte_array(env, key);
     int length = array_length(env, key);
-    EVP_PKEY *public_key = create_public_key(bytes, length);
-    kem_keyspec *spec = init_kem_keyspec_with_key(public_key, NULL, global_libctx); 
+    EVP_PKEY *public_key = decode_public_key_fips(bytes, length, global_libctx);
+    (*env)->ReleaseByteArrayElements(env, key, (jbyte*)bytes, JNI_ABORT);
+    kem_keyspec *spec = init_kem_keyspec_with_key(public_key, NULL, global_libctx);
+    if (spec == NULL) {
+        throwOOM(env, "Could not allocate KEM keyspec");
+        return 0;
+    }
+    jssl_status rc = init_encapsulator(spec);
+    if (rc != SUCCESS) {
+        free_kem_keyspec(&spec);
+        if (rc == FAIL_OOM)
+            throwOOM(env, "Out of memory initializing encapsulator");
+        else
+            throwProviderException(env, "Failed to initialize encapsulator");
+        return 0;
+    }
     return (jlong)spec;
 }
 
@@ -45,10 +59,16 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRS
 JNIEXPORT void JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA_00024RSAKEMEncapsulator_engineEncapsulate0
   (JNIEnv *env, jobject this, jbyteArray secret_bytes, jbyteArray encapsulated_bytes) {
     kem_keyspec *spec = (kem_keyspec*)get_long_field(env, this, "nativeHandle");
-    generate_and_wrap(spec);
+    jssl_status rc = generate_and_wrap(spec);
+    if (rc == FAIL_OOM) {
+        throwOOM(env, "Out of memory during encapsulation");
+        return;
+    } else if (rc == FAIL_EVP) {
+        throwProviderException(env, "Encapsulation failed");
+        return;
+    }
     copy_byte_array(env, secret_bytes, spec->secret, spec->secret_length);
     copy_byte_array(env, encapsulated_bytes, spec->wrapped_key, spec->wrapped_key_length);
-    return;
 }
 
 /*
@@ -75,5 +95,6 @@ JNIEXPORT jint JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA
 
 JNIEXPORT void JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA_00024RSAKEMEncapsulator_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_kem_keyspec((kem_keyspec**)&handle);
+    kem_keyspec *spec = (kem_keyspec*)handle;
+    free_kem_keyspec(&spec);
 }

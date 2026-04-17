@@ -50,10 +50,20 @@ static int array_equals(byte a1[], int l1, byte a2[], int l2) {
     return 1;
 }
 
+static int get_key_size_from_cipher_name(const char *cipher_name) {
+    if (strstr(cipher_name, "128") != NULL) return 16;
+    if (strstr(cipher_name, "192") != NULL) return 24;
+    if (strstr(cipher_name, "256") != NULL) return 32;
+    return -1; // unknown
+}
+
 int test_round_trip(OSSL_LIB_CTX *libctx, const char *cipher_type, const char *padding_name) {
-    unsigned char key[] = {0x5a, 0x33, 0x98, 0x0e, 0x71, 0xe7, 0xd6, 0x7f, 0xd6, 0xcf, 0x17, 0x14, 0x54, 0xdc, 0x96, 0xe5};
+    unsigned char key[] = {0x5a, 0x33, 0x98, 0x0e, 0x71, 0xe7, 0xd6, 0x7f, 0xd6, 0xcf, 0x17, 0x14, 0x54, 0xdc, 0x96, 0xe5,
+                           0x12, 0x2b, 0x7f, 0x3e, 0x2a, 0x19, 0x6d, 0xa2, 0x99, 0x8a, 0xdf, 0x22, 0xd1, 0x5e, 0x78, 0xc8};
     unsigned char iv[] =  {0x33, 0xae, 0x68, 0xeb, 0xb8, 0x01, 0x0c, 0x6b, 0x3d, 0xa6, 0xb9, 0xcb, 0x29, 0x3a, 0x4d, 0x34};
     unsigned char aad[] = {0x12, 0x31, 0x99, 0x71, 0x82, 0x88, 0x27, 0x2a, 0x9b, 0xad, 0xc4, 0x95, 0x7f, 0x6d, 0x11, 0x30};
+
+    int keysize =  get_key_size_from_cipher_name(cipher_type);
 
     byte encrypted_output[1024], decrypted_output[1024];
     int enc_out_len = 0, dec_out_len = 0, tmplen = 0; 
@@ -64,24 +74,31 @@ int test_round_trip(OSSL_LIB_CTX *libctx, const char *cipher_type, const char *p
         return 0;
     }
 
+    printf("Testing %s %s\n", cipher_type, padding_name);
     int total_enc_out_len = 0;
-    cipher_init(context, input, INPUT_SIZE, key, iv, 16, ENCRYPT);
+    cipher_init(context, input, INPUT_SIZE, key, keysize, iv, 16, OP_ENCRYPT);
     cipher_update_aad(context, &enc_out_len, aad, 16);
     cipher_update(context, encrypted_output, &enc_out_len, input, INPUT_SIZE);
     total_enc_out_len += enc_out_len;
     cipher_update(context, encrypted_output + total_enc_out_len, &enc_out_len, input, INPUT_SIZE);
     total_enc_out_len += enc_out_len;
-    cipher_do_final(context, encrypted_output + total_enc_out_len, &tmplen);
+    jssl_status rc = cipher_do_final(context, encrypted_output + total_enc_out_len, &tmplen);
     total_enc_out_len += tmplen;
-    //printf("total len = %d\n", total_enc_out_len);
-    //print_byte_array(encrypted_output, total_enc_out_len);
-    tmplen = 0;
-    cipher_init(context, encrypted_output, enc_out_len, key, iv, 16, DECRYPT);
-    cipher_update_aad(context, &dec_out_len, aad, 16);
-    cipher_update(context, decrypted_output, &dec_out_len, encrypted_output, total_enc_out_len);
-    cipher_do_final(context, decrypted_output + dec_out_len, &tmplen);
-    dec_out_len += tmplen;
     free_cipher(&context);
+    tmplen = 0;
+
+    cipher_context *context0 = create_cipher_context(libctx, cipher_type, padding_name);
+    cipher_init(context0, NULL, 0, key, keysize, iv, 16, OP_DECRYPT);
+    cipher_update_aad(context0, &dec_out_len, aad, 16);
+    int ciphertext_len = total_enc_out_len;
+    if (strstr(cipher_type, "-GCM") != NULL) {
+        ciphertext_len = total_enc_out_len - GCM_TAG_LEN;
+        memcpy(context0->gcm_tag, encrypted_output + ciphertext_len, GCM_TAG_LEN);
+    }
+    cipher_update(context0, decrypted_output, &dec_out_len, encrypted_output, ciphertext_len);
+    cipher_do_final(context0, decrypted_output + dec_out_len, &tmplen);
+    dec_out_len += tmplen;
+    free_cipher(&context0);
     if (array_equals(decrypted_output, dec_out_len, input, INPUT_SIZE*2)) {
         return 1;
     } else {

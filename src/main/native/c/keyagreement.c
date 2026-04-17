@@ -17,11 +17,13 @@
 #include "keyagreement.h"
 
 key_agreement* init_key_agreement(key_agreement_algorithm algo, OSSL_LIB_CTX *libctx) {
-    key_agreement agreement = {0};
     key_agreement *new_agreement = (key_agreement*)malloc(sizeof(key_agreement));
+    if (new_agreement == NULL) return NULL;
+    key_agreement agreement = {0};
     *new_agreement = agreement;
     new_agreement->algorithm = algo;
     new_agreement->libctx = libctx;
+    return new_agreement;
 }
 
 void set_private_key(key_agreement *agreement, EVP_PKEY *private_key) {
@@ -32,7 +34,7 @@ void set_peer_key(key_agreement *agreement, EVP_PKEY *peer_public_key) {
     agreement->peer_public_key = peer_public_key;
 }
 
-shared_secret *generate_shared_secret(key_agreement *agreement) {
+shared_secret *generate_shared_secret(key_agreement *agreement, int *evp_error) {
     EVP_PKEY_CTX *ctx = NULL;
     byte *secret_bytes = NULL;
     shared_secret *secret = NULL;
@@ -43,19 +45,23 @@ shared_secret *generate_shared_secret(key_agreement *agreement) {
 
     ctx = EVP_PKEY_CTX_new_from_pkey(agreement->libctx, agreement->private_key, NULL);
     if (ctx == NULL) {
+        if (evp_error) *evp_error = 1;
         goto error;
     }
 
     if (EVP_PKEY_derive_init(ctx) <= 0) {
+	if (evp_error) *evp_error = 1;
         goto error;
     }
 
     if (EVP_PKEY_derive_set_peer(ctx, agreement->peer_public_key) <= 0) {
+        if (evp_error) *evp_error = 1;
         goto error;
     }
 
     size_t secret_length = 0;
     if (EVP_PKEY_derive(ctx, NULL, &secret_length) <= 0) {
+        if (evp_error) *evp_error = 1;
         goto error;
     }
 
@@ -66,10 +72,12 @@ shared_secret *generate_shared_secret(key_agreement *agreement) {
     }
 
     if (EVP_PKEY_derive(ctx, secret_bytes, &secret_length) <= 0) {
+        if (evp_error) *evp_error = 1;
         goto error;
     }
 
     secret = (shared_secret*)malloc(sizeof(shared_secret));
+    if (secret == NULL) goto error;
     secret->bytes = secret_bytes;
     secret->length = secret_length;
     agreement->secret = secret;
@@ -88,25 +96,19 @@ error:
     return NULL;
 }
 
-int get_shared_secret(key_agreement *agreement, byte secret[]) {
-    if (secret != NULL) {
-        memcpy(secret, agreement->secret->bytes, agreement->secret->length);
-    }
-    return agreement->secret->length;
-}
 
-EVP_PKEY *generate_key(key_agreement_algorithm algo) {
+EVP_PKEY *generate_key(key_agreement_algorithm algo, OSSL_LIB_CTX *libctx) {
     EVP_PKEY_CTX *pctx = NULL;
     EVP_PKEY *key = NULL;
     OSSL_PARAM params[2];
     if (algo == DIFFIE_HELLMAN) {
-        if (NULL == (pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_DH, NULL))) {
+        if (NULL == (pctx = EVP_PKEY_CTX_new_from_name(libctx, "DH", NULL))) {
             goto error;
         }
         params[0] = OSSL_PARAM_construct_utf8_string("group", "ffdhe2048", 0);
         params[1] = OSSL_PARAM_construct_end();
     } else {
-        if (NULL == (pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL))) {
+        if (NULL == (pctx = EVP_PKEY_CTX_new_from_name(libctx, "EC", NULL))) {
             goto error;
         }
         params[0] = OSSL_PARAM_construct_utf8_string("group", "prime256v1", 0);
@@ -134,7 +136,8 @@ error:
 void free_shared_secret(shared_secret **pthis) {
     if (pthis == NULL || *pthis == NULL)
         return;
-    free((*pthis)->bytes);
+    OPENSSL_cleanse((*pthis)->bytes, (*pthis)->length);
+    OPENSSL_free((*pthis)->bytes);
     free(*pthis);
     *pthis = NULL;
 }
@@ -145,6 +148,7 @@ void free_key_agreement(key_agreement **pthis) {
     }
     EVP_PKEY_free((*pthis)->private_key);
     EVP_PKEY_free((*pthis)->peer_public_key);
+    free_shared_secret(&((*pthis)->secret));
     free(*pthis);
     *pthis = NULL;
 }

@@ -60,7 +60,7 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
         byte[] keyBytes;
 
         public PBKDF2SecretKey(char[] password, byte[] salt, int iterationCount) {
-            this.password = password;
+            this.password = password.clone();
             this.salt = salt;
             this.iterationCount = iterationCount;
         }
@@ -70,7 +70,7 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
         }
 
         public char[] getPassword() {
-            return password;
+            return password.clone();
         }
 
         public byte[] getSalt() {
@@ -86,8 +86,7 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
         }
 
         public String getFormat() {
-            // TODO: what's the right format here?
-            return null;
+            return "RAW";
         }
 
         public String getAlgorithm() {
@@ -101,6 +100,9 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
                                     pbeKeySpec.getSalt(), pbeKeySpec.getIterationCount());
             byte[] secretBytes = generateSecret0(pbeKeySpec.getPassword(), pbeKeySpec.getSalt(),
                                                 pbeKeySpec.getIterationCount());
+            if (secretBytes == null) {
+                throw new InvalidKeySpecException("PBKDF2 derivation failed");
+            }
             secretKey.setEncoded(secretBytes);
             return secretKey;
         } else {
@@ -119,12 +121,15 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
     protected SecretKey engineTranslateKey(SecretKey key) throws InvalidKeyException {
         if (key instanceof PBEKey pbeKey) {
             PBKDF2SecretKey secretKey = new PBKDF2SecretKey(pbeKey.getPassword(), pbeKey.getSalt(),
-                                                            pbeKey.getIterationCount()); 
+                                                            pbeKey.getIterationCount());
             byte[] secretBytes = generateSecret0(pbeKey.getPassword(), pbeKey.getSalt(), pbeKey.getIterationCount());
+            if (secretBytes == null) {
+                throw new InvalidKeyException("PBKDF2 derivation failed");
+            }
             secretKey.setEncoded(secretBytes);
             return secretKey;
         } else {
-            throw new InvalidKeyException("A key of type PBEKey is expected, given " + key.getClass() + " instead");
+            throw new InvalidKeyException("A key of type PBEKey is expected, given " + key.getClass());
         }
     }
 

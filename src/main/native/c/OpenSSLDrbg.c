@@ -16,6 +16,7 @@
  */
 #include "OpenSSLDrbg.h"
 #include "drbg.h"
+#include "jni_utils.h"
 
 /* TODOs
  * 1. throw exceptions for error situations
@@ -46,23 +47,61 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_drbg_OpenSSLDrbg_init
   (JNIEnv *env, jobject this, jstring name, jint strength, jboolean prediction_resistance, jboolean reseeding, jbyteArray personalization_string) {
     const char *name_string = (*env)->GetStringUTFChars(env, name, 0);
     byte *ps_bytes_native = NULL;
+    DRBGParams *params = NULL;
+    DRBG *drbg = NULL;
     jsize pstr_length = 0;
 
     if (personalization_string != NULL) { 
         pstr_length = (*env)->GetArrayLength(env, personalization_string);
         byte *pstr_bytes = (*env)->GetByteArrayElements(env, personalization_string, NULL);
         ps_bytes_native = (byte *)malloc(pstr_length);
+	if (ps_bytes_native == NULL) {
+            (*env)->ReleaseByteArrayElements(env, personalization_string, pstr_bytes, JNI_ABORT);
+	    throwOOM(env, "Could not allocate memory for password");
+	    goto error;
+	}
         memcpy(ps_bytes_native, pstr_bytes, pstr_length);
         (*env)->ReleaseByteArrayElements(env, personalization_string, pstr_bytes, JNI_ABORT);
     }
 
-    DRBGParams *params = (DRBGParams *)malloc(sizeof(DRBGParams));
+    params = (DRBGParams *)malloc(sizeof(DRBGParams));
+    if (params == NULL) {
+        throwOOM(env, "Failed to allocate memory for DRBG parameters");
+	goto error;
+    }
     populate_params(params, strength, prediction_resistance, reseeding, ps_bytes_native, pstr_length, NULL, 0);
+    ps_bytes_native = NULL; // ownership transferred to params; free_DRBGParams will release it
 
-    DRBG* drbg = create_DRBG_with_params(name_string, NULL, params);
+    int evp_error = JNI_FALSE;
+    drbg = create_DRBG_with_params(name_string, NULL, params, &evp_error);
     (*env)->ReleaseStringUTFChars(env, name, name_string);
 
-    return (jlong)drbg; 
+    if (drbg == NULL) {
+        throwOOM(env, "Failed to allocate memory for a DRBG");
+	goto error;
+    }
+
+    if (evp_error) {
+        throwProviderException(env, "Random instantation failed");
+	goto error;
+    }
+
+    return (jlong)drbg;
+
+error:
+    if (ps_bytes_native) {
+        memset(ps_bytes_native, 0, pstr_length);
+        free(ps_bytes_native);
+    }
+
+    if (params) {
+        free_DRBGParams(&params);
+    }
+
+    if (drbg) {
+        free_DRBG(&drbg);
+    }
+    return (jlong)0;    
 }
 
 /*
@@ -73,28 +112,58 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_drbg_OpenSSLDrbg_init
 JNIEXPORT void JNICALL Java_com_canonical_openssl_drbg_OpenSSLDrbg_nextBytes0
   (JNIEnv *env, jobject this, jbyteArray out_bytes, jint strength, jboolean prediction_resistance , jbyteArray additional_input) {
     byte *ai_bytes_native = NULL;
+    byte *output_bytes = NULL;
+    DRBGParams *params = NULL;
     jsize additional_input_length = 0;
     jclass clazz = (*env)->GetObjectClass(env, this);
     jfieldID drbg_id = (*env)->GetFieldID(env, clazz, "drbgContext", "J");
     jlong drbg_handle = (*env)->GetLongField(env, this, drbg_id);
 
     int output_bytes_length = (*env)->GetArrayLength(env, out_bytes);
-    byte *output_bytes = (byte *)malloc(output_bytes_length);
+    output_bytes = (byte *)malloc(output_bytes_length);
+    if (output_bytes == NULL) {
+        throwOOM(env, "Could not allocate output bytes");
+	goto cleanup;
+    }
 
     if (additional_input != NULL) {
         additional_input_length = (*env)->GetArrayLength(env, additional_input);
         jbyte *additional_input_bytes = (*env)->GetByteArrayElements(env, additional_input, NULL);
         ai_bytes_native = (byte*)malloc(additional_input_length);
+	if (ai_bytes_native == NULL) {
+            throwOOM(env, "Could not allocate memory for additional input");
+	    goto cleanup;
+	}
         memcpy(ai_bytes_native, additional_input_bytes, additional_input_length);
         (*env)->ReleaseByteArrayElements(env, additional_input, additional_input_bytes, JNI_ABORT);
     }
     
-    DRBGParams *params = (DRBGParams *)malloc(sizeof(DRBGParams));
+    params = (DRBGParams *)malloc(sizeof(DRBGParams));
+    if (params == NULL) {
+        throwOOM(env, "Could not allocate DRBG params");
+	goto cleanup;
+    }
     populate_params(params, strength, prediction_resistance, 0, NULL, 0, ai_bytes_native, additional_input_length);
+    ai_bytes_native = NULL; // ownership transferred to params; free_DRBGParams will release it
 
     next_rand_with_params((DRBG *)drbg_handle, output_bytes, output_bytes_length, params);
-
     (*env)->SetByteArrayRegion(env, out_bytes, 0, output_bytes_length, output_bytes);
+
+cleanup:
+    if (output_bytes) {
+        OPENSSL_cleanse(output_bytes, output_bytes_length);
+        free(output_bytes);
+    }
+
+    if (ai_bytes_native) {
+        memset(ai_bytes_native, 0, additional_input_length);
+	free(ai_bytes_native);
+    }
+
+    if (params)
+        free_DRBGParams(&params);
+
+    return;
 }
 
 /*
@@ -108,33 +177,58 @@ JNIEXPORT void JNICALL Java_com_canonical_openssl_drbg_OpenSSLDrbg_reseed0
     jsize ai_length = 0;
     jsize input_length = 0;
     byte *input_bytes = NULL;
+    jbyte *ai_pinned = NULL;
 
     jclass clazz = (*env)->GetObjectClass(env, this);
     jfieldID drbg_id = (*env)->GetFieldID(env, clazz, "drbgContext", "J");
     jlong drbg_handle = (*env)->GetLongField(env, this, drbg_id);
 
-
     if (in_bytes != NULL) {
         input_length = (*env)->GetArrayLength(env, in_bytes);
-        input_bytes = (*env)->GetByteArrayElements(env, in_bytes, NULL);         
+        input_bytes = (*env)->GetByteArrayElements(env, in_bytes, NULL);
     }
 
     if (additional_input != NULL) {
         ai_length = (*env)->GetArrayLength(env, additional_input);
-        jbyte *bytes = (*env)->GetByteArrayElements(env, additional_input, NULL);
+        ai_pinned = (*env)->GetByteArrayElements(env, additional_input, NULL);
         ai_bytes = (byte *)malloc(ai_length);
-        memcpy(ai_bytes, bytes, ai_length);
+        if (ai_bytes == NULL) {
+            throwOOM(env, "Could not allocate memory for additional data");
+            goto cleanup;
+        }
+        memcpy(ai_bytes, ai_pinned, ai_length);
     }
 
-
     DRBGParams *params = (DRBGParams *)malloc(sizeof(DRBGParams));
+    if (params == NULL) {
+        throwOOM(env, "Could not allocate memory for DRBG params");
+        goto cleanup;
+    }
+
     populate_params(params, -1, 0, reseeding, NULL, 0, (byte *)ai_bytes, ai_length);
+    ai_bytes = NULL; // ownership transferred to params; free_DRBGParams will release it
 
     if (input_bytes == NULL) {
-        reseed_with_params((DRBG*)drbg_handle, params); 
+        int status = reseed_with_params((DRBG*)drbg_handle, params);
+        if (FAIL_GETRANDOM == status) {
+            throwProviderException(env, "getrandom() failed to generate seed");
+        }
     } else {
         reseed_with_seed_and_params((DRBG*)drbg_handle, input_bytes, input_length, params);
     }
+
+cleanup:
+    if (ai_bytes) {
+        memset(ai_bytes, 0, ai_length);
+        free(ai_bytes);
+    }
+    if (ai_pinned) {
+        (*env)->ReleaseByteArrayElements(env, additional_input, ai_pinned, JNI_ABORT);
+    }
+    if (input_bytes) {
+        (*env)->ReleaseByteArrayElements(env, in_bytes, input_bytes, JNI_ABORT);
+    }
+    free_DRBGParams(&params);
 }
 
 #define MAX_SEED_BYTES 256

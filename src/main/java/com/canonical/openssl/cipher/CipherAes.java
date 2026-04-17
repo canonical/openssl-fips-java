@@ -39,6 +39,10 @@ public abstract class CipherAes extends OpenSSLCipher {
 
     @Override
     protected int engineGetOutputSize(int inputSize) {
+        if (getMode().equals("GCM")) {
+            return opmode == ENCRYPT ? inputSize + GCM_TAG_LEN : inputSize - GCM_TAG_LEN;
+        }
+
         if(getPadding().equals("NONE"))
             return inputSize;
 

@@ -47,7 +47,7 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_key_KeyConverter_privateKeyTo
     /* Use FIPS-safe decoder to convert DER to EVP_PKEY */
     EVP_PKEY *pkey = decode_private_key_fips(bytes, (size_t)length, global_libctx);
 
-    free(bytes);
+    (*env)->ReleaseByteArrayElements(env, encodedKey, (jbyte*)bytes, JNI_ABORT);
 
     return (jlong)pkey;
 }
@@ -77,7 +77,7 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_key_KeyConverter_publicKeyToE
     /* Use FIPS-safe decoder to convert DER to EVP_PKEY */
     EVP_PKEY *pkey = decode_public_key_fips(bytes, (size_t)length, global_libctx);
 
-    free(bytes);
+    (*env)->ReleaseByteArrayElements(env, encodedKey, (jbyte*)bytes, JNI_ABORT);
 
     return (jlong)pkey;
 }

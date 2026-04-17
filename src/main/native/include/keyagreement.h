@@ -39,7 +39,7 @@ typedef struct key_agreement {
     shared_secret *secret;
 } key_agreement;
 
-EVP_PKEY *generate_key(key_agreement_algorithm algo);
+EVP_PKEY *generate_key(key_agreement_algorithm algo, OSSL_LIB_CTX *libctx);
 
 key_agreement* init_key_agreement(key_agreement_algorithm algo, OSSL_LIB_CTX *libctx);
 
@@ -47,11 +47,7 @@ void set_private_key(key_agreement *agreement, EVP_PKEY *private_key);
 
 void set_peer_key(key_agreement *agreement, EVP_PKEY *peer_public_key);
 
-shared_secret *generate_shared_secret(key_agreement *agreement);
-
-int get_shared_secret_bytes(key_agreement *agreement, byte secret[]);
-
-EVP_PKEY *generate_key(key_agreement_algorithm algo);
+shared_secret *generate_shared_secret(key_agreement *agreement, int *evp_error);
 
 void free_key_agreement(key_agreement **this);
 
