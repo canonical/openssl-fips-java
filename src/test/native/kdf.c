@@ -46,14 +46,14 @@ int test_pbkdf2(OSSL_LIB_CTX *libctx) {
     kdf_spec *spec = create_pbkdf_spec(password, strlen(password), pbkdf2_salt, strlen(pbkdf2_salt), pbkdf2_iterations);
     kdf_params *params = create_pbkdf_params("SHA-512");
     byte output[64] = {0};
-    if (kdf_derive(libctx, spec, params, output, 64, PBKDF2) <= 0) {
+    if (kdf_derive(libctx, spec, params, output, 64, PBKDF2) != SUCCESS) {
         printf("FAILED (derive)\n");
-        free_kdf_spec(&spec);
-        free_kdf_params(&params);
+        free_kdf_spec(&spec, PBKDF2);
+        free_kdf_params(&params, PBKDF2);
         return 1;
     }
-    free_kdf_spec(&spec);
-    free_kdf_params(&params);
+    free_kdf_spec(&spec, PBKDF2);
+    free_kdf_params(&params, PBKDF2);
     printf("PASSED\n");
     return 0; 
 }
@@ -63,14 +63,14 @@ int test_hkdf(OSSL_LIB_CTX *libctx) {
     kdf_spec *spec = create_hkdf_spec(hkdf_salt, sizeof(hkdf_salt), hkdf_info, sizeof(hkdf_info), hkdf_key, sizeof(hkdf_key));
     kdf_params *params = create_pbkdf_params("SHA-256");
     byte output[42] = {0};
-    if (kdf_derive(libctx, spec, params, output, 42, HKDF) <= 0) {
-        free_kdf_spec(&spec);
-        free_kdf_params(&params);
+    if (kdf_derive(libctx, spec, params, output, 42, HKDF) != SUCCESS) {
+        free_kdf_spec(&spec, HKDF);
+        free_kdf_params(&params, HKDF);
         printf("FAILED (derive)\n");
         return 1;
     }
-    free_kdf_spec(&spec);
-    free_kdf_params(&params);
+    free_kdf_spec(&spec, HKDF);
+    free_kdf_params(&params, HKDF);
     printf("PASSED\n");
     return 0;
 }

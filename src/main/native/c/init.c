@@ -76,11 +76,9 @@ OSSL_LIB_CTX* load_openssl_base_provider(const char* conf_file_path) {
 
 
 void unload_libctx(OSSL_LIB_CTX *libctx) {
-    OSSL_PROVIDER_unload(pfips);
-    OSSL_PROVIDER_unload(pbase);
-    if (libctx != NULL) {
-        OSSL_LIB_CTX_free(libctx);
-    }
+    if (pfips != NULL) OSSL_PROVIDER_unload(pfips);
+    if (pbase != NULL) OSSL_PROVIDER_unload(pbase);
+    if (libctx != NULL) OSSL_LIB_CTX_free(libctx);
 }
 
 static void unload_global_libctx() {
@@ -90,10 +88,11 @@ static void unload_global_libctx() {
 int JNI_OnLoad(JavaVM* vm, void *reserved) {
     const char *default_cnf = "/usr/local/ssl/openssl.cnf";
     const char *custom_cnf = getenv("OPENSSL_CUSTOM_CONF");
-    if (custom_cnf != NULL) {
-        global_libctx = load_openssl_fips_provider(custom_cnf);
-    } else {
-        global_libctx = load_openssl_fips_provider(default_cnf);
+    const char *conf = custom_cnf != NULL ? custom_cnf : default_cnf;
+    global_libctx = load_openssl_fips_provider(conf);
+    if (global_libctx == NULL) {
+        fprintf(stderr, "Failed to load FIPS provider from %s\n", conf);
+        return JNI_ERR;
     }
     return JNI_VERSION_10;
 }

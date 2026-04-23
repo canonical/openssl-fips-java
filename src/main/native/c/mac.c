@@ -22,6 +22,7 @@
 
 mac_params *init_mac_params(char *cipher, char *digest, byte *iv, size_t iv_length, size_t output_length) {
     mac_params *new = (mac_params*)malloc(sizeof(mac_params));
+    if (new == NULL) return NULL;
     new->cipher_name = cipher;
     new->digest_name = digest;
     new->iv = iv;
@@ -48,60 +49,60 @@ static void set_params(EVP_MAC_CTX *ctx, mac_params *params) {
     }
 }
 
-mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params *params) {
+mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params *params, int *oom) {
     mac_context *new_ctx = (mac_context *)malloc(sizeof(mac_context));
+    if (new_ctx == NULL) {
+        if (oom) *oom = 1;
+        return NULL;
+    }
     new_ctx->algorithm = algorithm;
+    new_ctx->ctx = NULL;
+
     EVP_MAC *mac = EVP_MAC_fetch(NULL, algorithm, NULL);
-    EVP_MAC_CTX *ctx = EVP_MAC_CTX_new(mac);
-    EVP_MAC_free(mac);
-    if (NULL == ctx) {
+    if (mac == NULL) {
         goto error;
     }
-    new_ctx->ctx = ctx;
-    if (NULL != params) {
+    new_ctx->ctx = EVP_MAC_CTX_new(mac);
+    EVP_MAC_free(mac);
+    if (new_ctx->ctx == NULL) {
+        goto error;
+    }
+    if (params != NULL) {
         set_params(new_ctx->ctx, params);
     }
     if (0 == EVP_MAC_init(new_ctx->ctx, (const unsigned char*)key, key_length, NULL)) {
         goto error;
-    }   
+    }
     return new_ctx;
 
 error:
     ERR_print_errors_fp(stderr);
     free_mac_context(&new_ctx);
     return NULL;
-
 }
 
-int mac_update(mac_context *ctx, byte *input, size_t input_size) {
+jssl_status mac_update(mac_context *ctx, byte *input, size_t input_size) {
     if (0 == EVP_MAC_update(ctx->ctx, input, input_size)) {
-        free_mac_context(&ctx);
-        return 0;
+        ERR_print_errors_fp(stderr);
+        return FAIL_EVP;
     }
-    return 1;
+    return SUCCESS;
 }
 
-int mac_final(mac_context *ctx, byte *output, size_t *bytes_written, size_t output_size) {
+jssl_status mac_final(mac_context *ctx, byte *output, size_t *bytes_written, size_t output_size) {
     if (0 == EVP_MAC_final(ctx->ctx, output, bytes_written, output_size)) {
-        free_mac_context(&ctx);
-        return 0;
+        ERR_print_errors_fp(stderr);
+        return FAIL_EVP;
     }
-    return 1;
+    return SUCCESS;
 }
 
-int mac_final_with_input(mac_context *ctx, byte *input, size_t input_size,
+jssl_status mac_final_with_input(mac_context *ctx, byte *input, size_t input_size,
                      byte *output, size_t *bytes_written, size_t output_size) {
-    if (0 == mac_update(ctx, input, input_size)) {
-        goto error;
-    }
-    if (0 == mac_final(ctx, output, bytes_written, output_size)) {
-        goto error;
-    }
-    return 1;
-
-error:
-    free_mac_context(&ctx);
-    return 0;
+    jssl_status rc = mac_update(ctx, input, input_size);
+    if (rc != SUCCESS)
+        return rc;
+    return mac_final(ctx, output, bytes_written, output_size);
 }
 
 size_t get_mac_length(mac_context *mac) {

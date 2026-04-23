@@ -15,21 +15,11 @@
  *
  */
 #include <openssl/evp.h>
-#include <openssl/x509.h>
 #include <openssl/decoder.h>
 
 #include "jssl.h"
 
 extern OSSL_LIB_CTX *global_libctx;
-
-/* Legacy functions using d2i_* - still supported but not preferred for FIPS */
-EVP_PKEY *create_private_key(int type, byte* bytes, size_t length) {
-    return d2i_PrivateKey_ex(type, NULL, (const byte**)&bytes, length, global_libctx, NULL);
-}
-
-EVP_PKEY *create_public_key(byte* bytes, size_t length) {
-    return d2i_PUBKEY_ex(NULL, (const byte**) &bytes, length, global_libctx, NULL);
-}
 
 /* FIPS-safe decoder functions using OSSL_DECODER API
  * These functions properly route through the FIPS provider and respect
@@ -58,7 +48,7 @@ EVP_PKEY *decode_private_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libc
     }
 
     /* Decode the DER data into an EVP_PKEY */
-    if (OSSL_DECODER_from_data(dctx, &data, &data_len) != 1) {
+    if (OSSL_DECODER_from_data(dctx, &data, &data_len) != 1 || data_len != 0) {
         pkey = NULL;
     }
 
@@ -86,7 +76,7 @@ EVP_PKEY *decode_public_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libct
     }
 
     /* Decode the DER data into an EVP_PKEY */
-    if (OSSL_DECODER_from_data(dctx, &data, &data_len) != 1) {
+    if (OSSL_DECODER_from_data(dctx, &data, &data_len) != 1 || data_len != 0) {
         pkey = NULL;
     }
 

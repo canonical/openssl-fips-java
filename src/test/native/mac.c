@@ -58,17 +58,22 @@ static unsigned char data[] =
 void run_test(mac_context *ctx) {
     if (NULL == ctx) {
         printf("FAILED (Couldn't init MAC)\n");
+        rc = 1;
+        return;
     }
 
-    if(0 == (mac_update(ctx, data, sizeof(data)))) {
+    if (mac_update(ctx, data, sizeof(data)) != SUCCESS) {
         printf("FAILED (Update failed)\n");
+        rc = 1;
+        return;
     }
 
     byte output[256];
     size_t written;
-    if(0 == (mac_final(ctx, output, &written, 256))) {
-        printf("FAILED(final)\n");
+    if (mac_final(ctx, output, &written, 256) != SUCCESS) {
+        printf("FAILED (Final failed)\n");
         rc = 1;
+        return;
     }
 
     printf("PASSED (MAC: ");
@@ -82,7 +87,7 @@ void run_test(mac_context *ctx) {
 void test_cmac(OSSL_LIB_CTX *libctx) {
     printf("Testing CMAC: ");
     mac_params *params = init_mac_params("AES-256-CBC", NULL, NULL, 0, 0);
-    mac_context *ctx = mac_init("CMAC", key, 32, params);
+    mac_context *ctx = mac_init("CMAC", key, 32, params, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
     free(params);
@@ -91,7 +96,7 @@ void test_cmac(OSSL_LIB_CTX *libctx) {
 void test_hmac_sha1(OSSL_LIB_CTX *libctx) {
     printf("Testing HMAC with SHA-1: ");
     mac_params *params = init_mac_params(NULL, "SHA1", NULL, 0, 0); 
-    mac_context *ctx = mac_init("HMAC", key, 64, params);
+    mac_context *ctx = mac_init("HMAC", key, 64, params, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
     free(params);
@@ -100,7 +105,7 @@ void test_hmac_sha1(OSSL_LIB_CTX *libctx) {
 void test_hmac_sha3(OSSL_LIB_CTX *libctx) {
     printf("Testing HMAC with SHA3-512: ");
     mac_params *params = init_mac_params(NULL, "SHA3-512", NULL, 0, 0);
-    mac_context *ctx = mac_init("HMAC", key, 64, params);
+    mac_context *ctx = mac_init("HMAC", key, 64, params, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
     free(params);
@@ -109,7 +114,7 @@ void test_hmac_sha3(OSSL_LIB_CTX *libctx) {
 void test_gmac(OSSL_LIB_CTX *libctx) {
     printf("Testing GMAC: ");
     mac_params *params = init_mac_params("AES-128-GCM", NULL, iv, sizeof(iv), 0);
-    mac_context *ctx = mac_init("GMAC", key, 16, params);
+    mac_context *ctx = mac_init("GMAC", key, 16, params, NULL);
     run_test(ctx); 
     free_mac_context(&ctx);
     free(params);
@@ -117,14 +122,14 @@ void test_gmac(OSSL_LIB_CTX *libctx) {
 
 void test_kmac128(OSSL_LIB_CTX *libctx) {
     printf("Testing KMAC-128: ");
-    mac_context *ctx = mac_init("KMAC-128", key, 16, NULL);
+    mac_context *ctx = mac_init("KMAC-128", key, 16, NULL, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
 }
 
 void test_kmac256(OSSL_LIB_CTX *libctx) {
     printf("Testing KMAC-256: ");
-    mac_context *ctx = mac_init("KMAC-256", key, 32, NULL);
+    mac_context *ctx = mac_init("KMAC-256", key, 32, NULL, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
 }

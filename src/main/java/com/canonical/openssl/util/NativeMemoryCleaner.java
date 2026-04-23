@@ -19,5 +19,9 @@ package com.canonical.openssl.util;
 import java.lang.ref.Cleaner;
 
 public class NativeMemoryCleaner {
+    /* Note: Native memory held by all the fips crypto classes is cleaned.
+     * up by this cleaner. We do not want to have multiple Cleaners since
+     * every cleaner spawns its own daemon thread.
+     */
     public static Cleaner cleaner = Cleaner.create();
 }

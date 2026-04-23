@@ -31,8 +31,13 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRS
   (JNIEnv *env, jobject this, jbyteArray key) {
     byte* bytes = jbyteArray_to_byte_array(env, key);
     int length = array_length(env, key);
-    EVP_PKEY *private_key = create_private_key(EVP_PKEY_RSA, bytes, length);
+    EVP_PKEY *private_key = decode_private_key_fips(bytes, length, global_libctx);
+    (*env)->ReleaseByteArrayElements(env, key, (jbyte*)bytes, JNI_ABORT);
     kem_keyspec *spec = init_kem_keyspec_with_key(NULL, private_key, global_libctx);
+    if (spec == NULL) {
+        throwOOM(env, "Could not allocate KEM keyspec");
+        return 0;
+    }
     return (jlong)spec;
 }
 
@@ -47,7 +52,17 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSL
     byte* bytes = jbyteArray_to_byte_array(env, encapsulated);
     int length = array_length(env, encapsulated);
     set_wrapped_key(spec, bytes, length);
-    unwrap(spec);
+    jssl_status rc = unwrap(spec);
+    (*env)->ReleaseByteArrayElements(env, encapsulated, (jbyte*)bytes, JNI_ABORT);
+    spec->wrapped_key = NULL;
+    spec->wrapped_key_length = 0;
+    if (rc == FAIL_OOM) {
+        throwOOM(env, "Out of memory during decapsulation");
+        return NULL;
+    } else if (rc == FAIL_EVP) {
+        throwProviderException(env, "Decapsulation failed");
+        return NULL;
+    }
     return new_byteArray(env, spec->secret, spec->secret_length);
 }
 
@@ -76,5 +91,6 @@ JNIEXPORT jint JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA
 
 JNIEXPORT void JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA_00024RSAKEMDecapsulator_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_kem_keyspec((kem_keyspec**)&handle);
+    kem_keyspec *spec = (kem_keyspec*)handle;
+    free_kem_keyspec(&spec);
 }
