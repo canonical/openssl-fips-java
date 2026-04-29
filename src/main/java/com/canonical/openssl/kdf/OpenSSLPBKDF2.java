@@ -18,6 +18,7 @@ package com.canonical.openssl.kdf;
 
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.security.spec.KeySpec;
+import java.util.Arrays;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.PBEKeySpec;
 import java.security.InvalidKeyException;
@@ -58,6 +59,7 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
         int iterationCount;
 
         byte[] keyBytes;
+        private volatile boolean destroyed = false;
 
         public PBKDF2SecretKey(char[] password, byte[] salt, int iterationCount) {
             this.password = password.clone();
@@ -65,23 +67,34 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
             this.iterationCount = iterationCount;
         }
 
+        private void checkDestroyed() {
+            if (destroyed) {
+                throw new IllegalStateException("PBKDF2SecretKey has been destroyed");
+            }
+        }
+
         public int getIterationCount() {
+            checkDestroyed();
             return iterationCount;
         }
 
         public char[] getPassword() {
+            checkDestroyed();
             return password.clone();
         }
 
         public byte[] getSalt() {
+            checkDestroyed();
             return salt;
         }
 
         public void setEncoded(byte[] keyBytes) {
+            checkDestroyed();
             this.keyBytes = keyBytes;
         }
 
         public byte[] getEncoded() {
+            checkDestroyed();
             return keyBytes;
         }
 
@@ -91,6 +104,25 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
 
         public String getAlgorithm() {
             return "PBKDF2-SHA512";
+        }
+
+        @Override
+        public void destroy() {
+            if (destroyed) {
+                return;
+            }
+            if (password != null) {
+                Arrays.fill(password, '\0');
+            }
+            if (keyBytes != null) {
+                Arrays.fill(keyBytes, (byte) 0);
+            }
+            destroyed = true;
+        }
+
+        @Override
+        public boolean isDestroyed() {
+            return destroyed;
         }
     }
 

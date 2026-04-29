@@ -95,6 +95,7 @@ DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_p
     newDRBG->rand = rand;
     newDRBG->context = context;
     newDRBG->seed = NULL;
+    newDRBG->seed_length = 0;
     newDRBG->params = drbg_params;
     newDRBG->parent = parent;
     return newDRBG;
@@ -130,7 +131,10 @@ void free_DRBG(DRBG **pgenerator) {
         return;
     }
     free_DRBGParams(&((*pgenerator)->params));
-    free((*pgenerator)->seed);
+    if ((*pgenerator)->seed != NULL) {
+        OPENSSL_cleanse((*pgenerator)->seed, (*pgenerator)->seed_length);
+        free((*pgenerator)->seed);
+    }
     EVP_RAND_CTX_free((*pgenerator)->context);
     EVP_RAND_free((*pgenerator)->rand);
     free(*pgenerator);
@@ -159,8 +163,9 @@ int next_rand_int(DRBG *drbg, int num_bits) {
         return -1;
     output[num_bytes-1] &= mask;
 
-    int32_t target;
-    memcpy(&target, output, 4);
+    int32_t target = 0;
+    for (int i = 0; i < num_bytes; i++)
+        target |= (int32_t)((uint32_t)output[i] << (8 * i));
     return target;
 }
 

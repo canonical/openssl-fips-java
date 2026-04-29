@@ -118,7 +118,17 @@ error:
 
 int sv_update(sv_context *ctx, byte *data, size_t length) {
     if (ctx->type == SV_ED25519 || ctx->type == SV_ED448) {
-        ctx->data = data;
+        // Ed25519/Ed448 are one-shot: the message is consumed at sv_sign /
+        // sv_verify time, so the buffer must outlive this call. The caller's
+        // `data` is freed as soon as this function returns, so take a copy.
+        byte *buf = NULL;
+        if (length > 0) {
+            buf = (byte *)malloc(length);
+            if (buf == NULL) return 0;
+            memcpy(buf, data, length);
+        }
+        free(ctx->data);
+        ctx->data = buf;
         ctx->length = length;
         return 1;
     }
@@ -178,6 +188,7 @@ void free_sv_context(sv_context **pcontext) {
     }
     free_sv_key(&(*pcontext)->key);
     EVP_MD_CTX_free((*pcontext)->mctx);
+    free((*pcontext)->data);
     free(*pcontext);
     *pcontext = NULL;
 }
