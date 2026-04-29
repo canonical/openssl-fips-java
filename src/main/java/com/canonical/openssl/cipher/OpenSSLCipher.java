@@ -175,7 +175,7 @@ abstract public class OpenSSLCipher extends CipherSpi {
     @Override
     protected byte[] engineUpdate(byte[] bytes, int offset, int length) {
         if (offset + length > bytes.length) {
-            new IllegalArgumentException("Invalid offset and/or length");
+            throw new IllegalArgumentException("Invalid offset and/or length");
         }
         if (isModeCCM() && firstUpdate) {
             doInit0(bytes, offset, length, keyBytes, iv, opmode);

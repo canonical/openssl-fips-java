@@ -16,10 +16,16 @@
  */
 package com.canonical.openssl.util;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.EnumSet;
 
 public class NativeLibraryLoader {
     static String libFileName = "libjssl.so";
@@ -30,59 +36,59 @@ public class NativeLibraryLoader {
         if (loaded)
             return;
 
+        Path tempPath = null;
         try {
-            InputStream in = NativeLibraryLoader.class.getResourceAsStream(location + libFileName);
-            if (in == null) {
-                throw new IOException("Native library not found in resources: " + location + libFileName);
-            }
-
-            // Create a unique temp file name without using Files.createTempFile()
-            // Files.createTempFile() requires SecureRandom which may not be available yet
-            // when this provider is loaded in a FIPS-compliant JDK, causing NPE
             String tempDir = System.getProperty("java.io.tmpdir");
             if (tempDir == null || tempDir.isEmpty()) {
-                // Fallback: try user.home, then current directory
-                // Note: This is a best-effort approach when java.io.tmpdir is unavailable
                 tempDir = System.getProperty("user.home");
                 if (tempDir == null || tempDir.isEmpty()) {
                     tempDir = System.getProperty("user.dir", ".");
                 }
             }
-            
-            // Generate a unique file name using timestamp, thread ID, and hashcode
-            // This combination is highly unlikely to collide in practice
-            // Note: We cannot use UUID.randomUUID() as it may depend on SecureRandom
-            String uniqueSuffix = System.currentTimeMillis() + "-" + 
-                                Thread.currentThread().getId() + "-" + 
-                                System.identityHashCode(NativeLibraryLoader.class);
-            File tempFile = new File(tempDir, "libjssl-" + uniqueSuffix + ".so");
-            
-            // Attempt to create the file atomically to prevent race conditions
-            // If the file already exists, the creation will fail and we throw an exception
-            try (FileOutputStream out = new FileOutputStream(tempFile)) {
+
+            // PID + nanoTime + class identity: harder to predict than millis + threadId alone.
+            // UUID.randomUUID() is avoided because it may depend on SecureRandom, which is not
+            // yet available when this provider loads in a FIPS-compliant JDK.
+            String uniqueSuffix = ProcessHandle.current().pid() + "-" +
+                                  System.nanoTime() + "-" +
+                                  System.identityHashCode(NativeLibraryLoader.class);
+            tempPath = Paths.get(tempDir, "libjssl-" + uniqueSuffix + ".so");
+
+            InputStream in = NativeLibraryLoader.class.getResourceAsStream(location + libFileName);
+            if (in == null) {
+                throw new IOException("Native library not found in resources: " + location + libFileName);
+            }
+
+            // CREATE_NEW maps to open(O_CREAT|O_EXCL): atomic creation that fails if the path
+            // already exists or is a symlink, preventing pre-creation / symlink-substitution attacks.
+            // POSIX permissions rwx------ ensure the file is never world-readable.
+            try (FileChannel out = FileChannel.open(tempPath,
+                     EnumSet.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE),
+                     PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+                 InputStream src = in) {
                 byte[] buffer = new byte[8192];
                 int bytesRead;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
+                while ((bytesRead = src.read(buffer)) != -1) {
+                    ByteBuffer bb = ByteBuffer.wrap(buffer, 0, bytesRead);
+                    while (bb.hasRemaining()) {
+                        out.write(bb);
+                    }
                 }
-            } finally {
-                in.close();
             }
 
-            System.load(tempFile.getAbsolutePath());
+            System.load(tempPath.toAbsolutePath().toString());
             loaded = true;
-
-            // Delete the temp file immediately after loading since it's no longer needed
-            // The native library is now loaded into memory and the file is not required
-            // If deletion fails (e.g., file locked on some systems), it's not critical since
-            // the file will be cleaned up by the OS eventually, and this only happens once per JVM
-            if (!tempFile.delete()) {
-                // Deletion failed, but this is not critical - log for debugging if needed
-                // The file will remain in temp directory and be cleaned up by OS temp cleanup
-            }
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to load native library " + libFileName + ": " + e.getMessage(), e);
+        } finally {
+            if (tempPath != null) {
+                try {
+                    Files.delete(tempPath);
+                } catch (IOException ignored) {
+                    // Non-critical: file will be cleaned up by OS temp cleanup
+                }
+            }
         }
     }
 }

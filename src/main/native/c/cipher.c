@@ -123,27 +123,32 @@ error:
 }
 
 jssl_status cipher_init(cipher_context *ctx, byte in_buf[], int in_len, unsigned char *key, int key_len, unsigned char *iv, int iv_len, int op_mode) {
+    jssl_status ret = FAIL_OOM;
+
     if (key != NULL) {
         ctx->key = (unsigned char *) malloc(key_len);
-        if (ctx->key == NULL) return FAIL_OOM;
+        if (ctx->key == NULL) goto error;
         memcpy(ctx->key, key, key_len);
+        ctx->key_len = key_len;
     }
 
     if (iv != NULL) {
         ctx->iv = (unsigned char *) malloc(iv_len);
-        if (ctx->iv == NULL) return FAIL_OOM;
+        if (ctx->iv == NULL) goto error;
         memcpy(ctx->iv, iv, iv_len);
+        ctx->iv_len = iv_len;
     }
 
     if (in_buf != NULL) {
         ctx->initial_bytes = (byte *) malloc(in_len);
-        if (ctx->initial_bytes == NULL) return FAIL_OOM;
+        if (ctx->initial_bytes == NULL) goto error;
         memcpy(ctx->initial_bytes, in_buf, in_len);
     }
 
+    ret = FAIL_EVP;
     if (!EVP_CipherInit_ex(ctx->context, ctx->cipher, NULL, NULL, NULL, op_mode)) {
         ERR_print_errors_fp(stderr);
-        return FAIL_EVP;
+        goto error;
     }
 
     ctx->op_mode = op_mode;
@@ -154,10 +159,26 @@ jssl_status cipher_init(cipher_context *ctx, byte in_buf[], int in_len, unsigned
 
     if (!EVP_CipherInit_ex(ctx->context, NULL, NULL, ctx->key, ctx->iv, op_mode)) {
         ERR_print_errors_fp(stderr);
-        return FAIL_EVP;
+        goto error;
     }
     EVP_CIPHER_CTX_set_padding(ctx->context, ctx->padding);
     return SUCCESS;
+
+error:
+    if (ctx->key != NULL) {
+        OPENSSL_cleanse(ctx->key, key_len);
+        free(ctx->key);
+        ctx->key = NULL;
+    }
+    if (ctx->iv != NULL) {
+        free(ctx->iv);
+        ctx->iv = NULL;
+    }
+    if (ctx->initial_bytes != NULL) {
+        free(ctx->initial_bytes);
+        ctx->initial_bytes = NULL;
+    }
+    return ret;
 }
 
 jssl_status cipher_update_aad(cipher_context *ctx, int *out_len_ptr, byte aad_buf[], int aad_len) {
@@ -217,12 +238,12 @@ void free_cipher(cipher_context **pctx) {
     }
 
     if ((*pctx)->key != NULL) {
-        OPENSSL_cleanse((*pctx)->key, EVP_CIPHER_CTX_get_key_length((*pctx)->context));
+        OPENSSL_cleanse((*pctx)->key, (*pctx)->key_len);
         free((*pctx)->key);
     }
 
     if ((*pctx)->iv != NULL) {
-        OPENSSL_cleanse((*pctx)->iv, EVP_CIPHER_CTX_get_iv_length((*pctx)->context));
+        OPENSSL_cleanse((*pctx)->iv, (*pctx)->iv_len);
         free((*pctx)->iv);
     }
 

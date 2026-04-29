@@ -34,7 +34,9 @@ typedef struct cipher_context {
     int padding;
     byte gcm_tag[GCM_TAG_LEN];
     unsigned char *key;
+    int key_len;
     unsigned char *iv;
+    int iv_len;
     byte *initial_bytes; //track here for cleanup
 } cipher_context;
 

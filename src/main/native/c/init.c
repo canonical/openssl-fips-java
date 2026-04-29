@@ -94,6 +94,16 @@ int JNI_OnLoad(JavaVM* vm, void *reserved) {
         fprintf(stderr, "Failed to load FIPS provider from %s\n", conf);
         return JNI_ERR;
     }
+    if (!OSSL_PROVIDER_available(global_libctx, "base")) {
+        pbase = OSSL_PROVIDER_load(global_libctx, "base");
+        if (pbase == NULL) {
+            fprintf(stderr, "Failed to load base provider\n");
+            ERR_print_errors_fp(stderr);
+            unload_global_libctx();
+            global_libctx = NULL;
+            return JNI_ERR;
+        }
+    }
     return JNI_VERSION_10;
 }
 

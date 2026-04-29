@@ -118,6 +118,9 @@ public class OpenSSLDrbg extends SecureRandomSpi {
     }
 
     protected void engineNextBytes(byte[] bytes, SecureRandomParameters params) throws IllegalArgumentException {
+        if (!isInitialized()) {
+            throw new ProviderException("DRBG not initialized");
+        }
         synchronized (LOCK) {
             if (params == null) {
                 engineNextBytes(bytes);
@@ -144,6 +147,9 @@ public class OpenSSLDrbg extends SecureRandomSpi {
 
     @Override
     protected void engineReseed(SecureRandomParameters params) throws IllegalArgumentException {
+        if (!isInitialized()) {
+            throw new ProviderException("DRBG not initialized");
+        }
         synchronized (LOCK) {
             if (params == null) {
                 engineReseed();

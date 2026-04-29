@@ -244,6 +244,12 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_drbg_OpenSSLDrbg_generat
     jfieldID drbg_id = (*env)->GetFieldID(env, clazz, "drbgContext", "J");
     jlong drbg_handle = (*env)->GetLongField(env, this, drbg_id);
 
+    if (num_bytes < 0) {
+        (*env)->ThrowNew(env, (*env)->FindClass(env, "java/lang/IllegalArgumentException"),
+                         "num_bytes must not be negative");
+        return NULL;
+    }
+
     if (num_bytes > 256) {
         num_bytes = 256;
     }
