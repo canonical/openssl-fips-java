@@ -14,25 +14,33 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-package com.canonical.openssl.keyagreement;
+package com.canonical.openssl.keypairgenerator;
 
-import java.security.Key;
-import java.util.Arrays;
+import java.security.PublicKey;
 
-public final class DHKeyAgreement extends OpenSSLKeyAgreement {
-    protected long initialize(Key key) {
-        byte[] encoded = key.getEncoded();
-        try {
-            return engineInit0(OpenSSLKeyAgreement.AGREEMENT_DH, encoded);
-        } finally {
-            if (encoded != null) {
-                Arrays.fill(encoded, (byte) 0);
-            }
-        }
+final class EncodedPublicKey implements PublicKey {
+    private static final long serialVersionUID = 1L;
+
+    private final String algorithm;
+    private final byte[] encoded;
+
+    EncodedPublicKey(String algorithm, byte[] encoded) {
+        this.algorithm = algorithm;
+        this.encoded = encoded.clone();
     }
 
     @Override
-    public String toString() {
-        return "DHKeyAgreement-openssl";
+    public String getAlgorithm() {
+        return algorithm;
+    }
+
+    @Override
+    public String getFormat() {
+        return "X.509";
+    }
+
+    @Override
+    public byte[] getEncoded() {
+        return encoded.clone();
     }
 }

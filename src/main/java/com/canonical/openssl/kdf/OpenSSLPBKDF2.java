@@ -49,8 +49,13 @@ import javax.crypto.SecretKeyFactorySpi;
  */
 public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
 
+    private static final int FIPS_MIN_ITERATIONS = 1000;
+    private static final int DEFAULT_KEY_LENGTH_BYTES = 64;
+    private static final int MAX_KEY_LENGTH_BYTES;
+
     static {
         NativeLibraryLoader.load();
+        MAX_KEY_LENGTH_BYTES = getMaxKeyLengthBytes0();
     }
 
     public class PBKDF2SecretKey implements PBEKey {
@@ -63,7 +68,7 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
 
         public PBKDF2SecretKey(char[] password, byte[] salt, int iterationCount) {
             this.password = password.clone();
-            this.salt = salt;
+            this.salt = salt == null ? null : salt.clone();
             this.iterationCount = iterationCount;
         }
 
@@ -85,17 +90,17 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
 
         public byte[] getSalt() {
             checkDestroyed();
-            return salt;
+            return salt == null ? null : salt.clone();
         }
 
         public void setEncoded(byte[] keyBytes) {
             checkDestroyed();
-            this.keyBytes = keyBytes;
+            this.keyBytes = keyBytes == null ? null : keyBytes.clone();
         }
 
         public byte[] getEncoded() {
             checkDestroyed();
-            return keyBytes;
+            return keyBytes == null ? null : keyBytes.clone();
         }
 
         public String getFormat() {
@@ -114,6 +119,9 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
             if (password != null) {
                 Arrays.fill(password, '\0');
             }
+            if (salt != null) {
+                Arrays.fill(salt, (byte) 0);
+            }
             if (keyBytes != null) {
                 Arrays.fill(keyBytes, (byte) 0);
             }
@@ -128,18 +136,44 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
 
     protected SecretKey engineGenerateSecret(KeySpec keyspec) throws InvalidKeySpecException {
         if (keyspec instanceof PBEKeySpec pbeKeySpec) {
+            if (pbeKeySpec.getIterationCount() < FIPS_MIN_ITERATIONS) {
+                throw new InvalidKeySpecException(
+                    "PBKDF2 iteration count must be at least " + FIPS_MIN_ITERATIONS
+                    + " (FIPS SP 800-132)");
+            }
+            int keyLengthBytes = resolveKeyLengthBytes(pbeKeySpec.getKeyLength());
             PBKDF2SecretKey secretKey = new PBKDF2SecretKey(pbeKeySpec.getPassword(),
                                     pbeKeySpec.getSalt(), pbeKeySpec.getIterationCount());
             byte[] secretBytes = generateSecret0(pbeKeySpec.getPassword(), pbeKeySpec.getSalt(),
-                                                pbeKeySpec.getIterationCount());
+                                                pbeKeySpec.getIterationCount(), keyLengthBytes);
             if (secretBytes == null) {
                 throw new InvalidKeySpecException("PBKDF2 derivation failed");
             }
-            secretKey.setEncoded(secretBytes);
+            try {
+                secretKey.setEncoded(secretBytes);
+            } finally {
+                Arrays.fill(secretBytes, (byte) 0);
+            }
             return secretKey;
         } else {
             throw new InvalidKeySpecException("Invalid KeySpec type, should be PBEKeySpec");
         }
+    }
+
+    private static int resolveKeyLengthBytes(int keyLengthBits) throws InvalidKeySpecException {
+        if (keyLengthBits == 0) {
+            return DEFAULT_KEY_LENGTH_BYTES;
+        }
+        if (keyLengthBits < 0) {
+            throw new InvalidKeySpecException("Negative key length: " + keyLengthBits);
+        }
+        int bytes = (keyLengthBits + 7) / 8;
+        if (bytes > MAX_KEY_LENGTH_BYTES) {
+            throw new InvalidKeySpecException(
+                "Requested key length " + keyLengthBits + " bits exceeds the maximum supported "
+                + (MAX_KEY_LENGTH_BYTES * 8) + " bits");
+        }
+        return bytes;
     }
 
     protected KeySpec engineGetKeySpec(SecretKey key, Class<?> keySpec) throws InvalidKeySpecException {
@@ -151,19 +185,58 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
     }
 
     protected SecretKey engineTranslateKey(SecretKey key) throws InvalidKeyException {
-        if (key instanceof PBEKey pbeKey) {
-            PBKDF2SecretKey secretKey = new PBKDF2SecretKey(pbeKey.getPassword(), pbeKey.getSalt(),
-                                                            pbeKey.getIterationCount());
-            byte[] secretBytes = generateSecret0(pbeKey.getPassword(), pbeKey.getSalt(), pbeKey.getIterationCount());
-            if (secretBytes == null) {
-                throw new InvalidKeyException("PBKDF2 derivation failed");
-            }
-            secretKey.setEncoded(secretBytes);
-            return secretKey;
-        } else {
+        if (key == null) {
+            throw new InvalidKeyException("Key must not be null");
+        }
+        if (key instanceof PBKDF2SecretKey) {
+            return key;
+        }
+        if (!(key instanceof PBEKey pbeKey)) {
             throw new InvalidKeyException("A key of type PBEKey is expected, given " + key.getClass());
         }
+        String algorithm = pbeKey.getAlgorithm();
+        if (algorithm == null || !algorithm.regionMatches(true, 0, "PBKDF2", 0, 6)) {
+            throw new InvalidKeyException("Cannot translate non-PBKDF2 key, algorithm: " + algorithm);
+        }
+        if (!"RAW".equalsIgnoreCase(pbeKey.getFormat())) {
+            throw new InvalidKeyException("Cannot translate key with format: " + pbeKey.getFormat());
+        }
+        if (pbeKey.getIterationCount() < FIPS_MIN_ITERATIONS) {
+            throw new InvalidKeyException(
+                "PBKDF2 iteration count must be at least " + FIPS_MIN_ITERATIONS
+                + " (FIPS SP 800-132)");
+        }
+        // For RAW keys, getEncoded().length is the key length; preserve it.
+        byte[] existing = pbeKey.getEncoded();
+        int keyLengthBytes;
+        try {
+            keyLengthBytes = (existing != null && existing.length > 0)
+                ? existing.length : DEFAULT_KEY_LENGTH_BYTES;
+        } finally {
+            if (existing != null) {
+                Arrays.fill(existing, (byte) 0);
+            }
+        }
+        if (keyLengthBytes > MAX_KEY_LENGTH_BYTES) {
+            throw new InvalidKeyException(
+                "Key length " + (keyLengthBytes * 8) + " bits exceeds the maximum supported "
+                + (MAX_KEY_LENGTH_BYTES * 8) + " bits");
+        }
+        PBKDF2SecretKey secretKey = new PBKDF2SecretKey(pbeKey.getPassword(), pbeKey.getSalt(),
+                                                        pbeKey.getIterationCount());
+        byte[] secretBytes = generateSecret0(pbeKey.getPassword(), pbeKey.getSalt(),
+                                             pbeKey.getIterationCount(), keyLengthBytes);
+        if (secretBytes == null) {
+            throw new InvalidKeyException("PBKDF2 derivation failed");
+        }
+        try {
+            secretKey.setEncoded(secretBytes);
+        } finally {
+            Arrays.fill(secretBytes, (byte) 0);
+        }
+        return secretKey;
     }
 
-    private native byte[] generateSecret0(char[] password, byte[] salt, int iterationCount); 
+    private native byte[] generateSecret0(char[] password, byte[] salt, int iterationCount, int keyLength);
+    private static native int getMaxKeyLengthBytes0();
 }

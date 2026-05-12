@@ -15,7 +15,7 @@
  *
  */
 #include <drbg.h>
-#include <stdio.h>
+#include <errno.h>
 #include <sys/random.h>
 #include <unistd.h>
 
@@ -48,34 +48,34 @@ static int create_params(const char *name, OSSL_PARAM params[]) {
     return param_count;
 }
 
-DRBG* create_DRBG(const char* name, DRBG* parent) {
-    return create_DRBG_with_params(name, parent, NULL, NULL);
+DRBG* create_DRBG(OSSL_LIB_CTX *libctx, const char* name, DRBG* parent) {
+    return create_DRBG_with_params(libctx, name, parent, NULL, NULL);
 }
 
 #define MIN_NUMBER_OF_PARAMS 2
 #define MAX_NUMBER_OF_PARAMS 4
 
-DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_params, int *evp_error) {
+DRBG* create_DRBG_with_params(OSSL_LIB_CTX *libctx, const char* name, DRBG* parent, DRBGParams *drbg_params, int *evp_error) {
     EVP_RAND *rand = NULL;
     EVP_RAND_CTX *context = NULL;
     int rc = 1;
 
-    rand = EVP_RAND_fetch(NULL, name, NULL);
+    rand = EVP_RAND_fetch(libctx, name, "provider=fips");
     if (NULL == rand) {
-        fprintf(stderr, "Couldn't allocate EVP_RAND: %s\n", name);
+        rc = 0;
         goto error;
     }
-    
+
     context = EVP_RAND_CTX_new(rand, parent == NULL ? NULL : parent->context);
     if (NULL == context) {
-        fprintf(stderr, "Couldn't allocate EVP_RAND_CTX\n");
+        rc = 0;
         goto error;
     }
 
     OSSL_PARAM params[MAX_NUMBER_OF_PARAMS] = {0};
     int n_params = create_params(name, params);
     if (n_params < MIN_NUMBER_OF_PARAMS) {
-        fprintf(stderr, "Couldn't create params");
+        rc = 0;
         goto error;
     }
 
@@ -89,7 +89,6 @@ DRBG* create_DRBG_with_params(const char* name, DRBG* parent, DRBGParams *drbg_p
 
     if (!rc) goto error;
 
-    const OSSL_PROVIDER *prov = EVP_RAND_get0_provider(EVP_RAND_CTX_get0_rand(context));
     DRBG *newDRBG = (DRBG*) malloc(sizeof(DRBG));
     if (newDRBG == NULL) goto error;
     newDRBG->rand = rand;
@@ -172,34 +171,50 @@ int next_rand_int(DRBG *drbg, int num_bits) {
 int generate_seed(DRBG* generator, byte output[], int n_bytes) {
     DRBG *parent = generator->parent;
     if (parent != NULL) {
-        return next_rand(parent, output, n_bytes);
-    } else {
-        return getrandom(output, n_bytes, 0);
+        return next_rand(parent, output, n_bytes) > 0;
     }
+    if (n_bytes < 0) {
+        return 0;
+    }
+    size_t remaining = (size_t)n_bytes;
+    byte *p = output;
+    while (remaining > 0) {
+        ssize_t got = getrandom(p, remaining, 0);
+        if (got < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return 0;
+        }
+        if (got == 0) {
+            return 0;
+        }
+        p += got;
+        remaining -= (size_t)got;
+    }
+    return 1;
 }
 
 /*void reseed(DRBG* generator) {
     reseed_with_params(generator, &NO_PARAMS);
 }*/
 
+/* entropy is NULL: in FIPS mode the DRBG must pull from its configured entropy chain. */
 jssl_status reseed_with_params(DRBG *generator, DRBGParams *params) {
-    byte seed[128]; // TODO: what should the default seed size be?
-    size_t length = 128;
-    ssize_t num = getrandom(seed, length, 0);
-    if (num < length) {
-        return FAIL_GETRANDOM;
-    }
-    EVP_RAND_reseed(generator->context, params->prediction_resistance, seed, length, params->additional_data, params->additional_data_length);
-    OPENSSL_cleanse(seed, length);
-    return SUCCESS;
+    int rc = EVP_RAND_reseed(generator->context, params->prediction_resistance,
+                             NULL, 0,
+                             params->additional_data, params->additional_data_length);
+    return rc > 0 ? SUCCESS : FAIL_EVP;
 }
 
-void reseed_with_seed(DRBG* generator, byte seed[], int seed_length) {
-    EVP_RAND_reseed(generator->context, 0, seed, seed_length, NULL, 0);
-    OPENSSL_cleanse(seed, seed_length);
+jssl_status reseed_with_seed(DRBG* generator, byte seed[], int seed_length) {
+    int rc = EVP_RAND_reseed(generator->context, 0, seed, seed_length, NULL, 0);
+    return rc > 0 ? SUCCESS : FAIL_EVP;
 }
 
-void reseed_with_seed_and_params(DRBG* generator, byte seed[], int seed_length, DRBGParams *params) {
-    EVP_RAND_reseed(generator->context, params->prediction_resistance, seed, seed_length, params->additional_data, params->additional_data_length);
-    OPENSSL_cleanse(seed, seed_length);
+jssl_status reseed_with_seed_and_params(DRBG* generator, byte seed[], int seed_length, DRBGParams *params) {
+    int rc = EVP_RAND_reseed(generator->context, params->prediction_resistance,
+                             seed, seed_length,
+                             params->additional_data, params->additional_data_length);
+    return rc > 0 ? SUCCESS : FAIL_EVP;
 }

@@ -19,8 +19,6 @@
 
 #include "jssl.h"
 
-extern OSSL_LIB_CTX *global_libctx;
-
 /* FIPS-safe decoder functions using OSSL_DECODER API
  * These functions properly route through the FIPS provider and respect
  * provider boundaries, avoiding direct key structure manipulation.
@@ -32,7 +30,7 @@ EVP_PKEY *decode_private_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libc
     size_t data_len = length;
 
     if (libctx == NULL) {
-        libctx = global_libctx;
+        libctx = jssl_libctx();
     }
 
     /* Create decoder context for private keys in DER format
@@ -63,7 +61,7 @@ EVP_PKEY *decode_public_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libct
     size_t data_len = length;
 
     if (libctx == NULL) {
-        libctx = global_libctx;
+        libctx = jssl_libctx();
     }
 
     /* Create decoder context for public keys in DER format */

@@ -17,6 +17,7 @@
 import java.lang.FunctionalInterface;
 import java.util.Arrays;
 import java.util.function.*;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.security.Security;
@@ -27,6 +28,7 @@ import java.security.SecureRandom;
 import org.junit.Test;
 import org.junit.BeforeClass;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 public class MacTest {
@@ -195,13 +197,27 @@ public class MacTest {
 
     private TriFunction<Mac, SecretKeySpec, byte[], byte[]> macCompute = (mac, keySpec, input) -> {
         try {
-            mac.init(keySpec, null);
+            if (isGMAC(mac.getAlgorithm())) {
+                mac.init(keySpec, freshGMACNonce());
+            } else {
+                mac.init(keySpec, null);
+            }
             mac.update(input, 0, input.length);
             return mac.doFinal();
         } catch (Exception ike) {
             return null;
         }
     };
+
+    private static boolean isGMAC(String macName) {
+        return macName.startsWith("GMAC");
+    }
+
+    private static IvParameterSpec freshGMACNonce() {
+        byte[] nonce = new byte[12];
+        new SecureRandom().nextBytes(nonce);
+        return new IvParameterSpec(nonce);
+    }
 
     private void runTest(String name, SecretKeySpec keySpec, String macName) throws Exception {
         Mac mac1 = Mac.getInstance(macName, "OpenSSLFIPSProvider");
@@ -210,7 +226,13 @@ public class MacTest {
         byte[] output1 = macCompute.apply(mac1, keySpec, input);
         byte[] output2 = macCompute.apply(mac2, keySpec, input);
         byte[] output3 = macCompute.apply(mac3, keySpec, input1);
-        assertArrayEquals("Test for mac " + name + " failed.", output1, output2);
+        if (isGMAC(macName)) {
+            // Each Mac instance is initialized with a fresh random nonce, so
+            // tags of the same input under the same key must differ.
+            assertFalse("Test for mac " + name + " failed (output1==output2).", Arrays.equals(output1, output2));
+        } else {
+            assertArrayEquals("Test for mac " + name + " failed.", output1, output2);
+        }
         assertFalse("Test for mac " + name  + " failed.", Arrays.equals(output2, output3));
     }
 
@@ -221,7 +243,14 @@ public class MacTest {
         byte[][] outputs = new byte[12][];
 
         Mac mac = Mac.getInstance(macName, "OpenSSLFIPSProvider");
-        mac.init(keySpec, null);
+        int preInitLen = mac.getMacLength();
+        if (isGMAC(macName)) {
+            mac.init(keySpec, freshGMACNonce());
+        } else {
+            mac.init(keySpec, null);
+        }
+        assertEquals("getMacLength() before/after init disagree for " + name,
+                     preInitLen, mac.getMacLength());
 
         outputs[0] = macCompute1.apply(mac, input);
         mac.reset();

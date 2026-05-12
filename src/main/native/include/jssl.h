@@ -31,6 +31,7 @@ typedef enum {
 
 OSSL_LIB_CTX* load_openssl_fips_provider(const char*);
 void unload_libctx(OSSL_LIB_CTX *libctx);
+OSSL_LIB_CTX* jssl_libctx(void);
 
 /* Utility function for string comparison */
 static inline int str_equal(const char *str1, const char *str2) {

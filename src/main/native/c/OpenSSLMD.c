@@ -20,8 +20,6 @@
 #include "jni_utils.h"
 #include <openssl/crypto.h>
 
-extern OSSL_LIB_CTX *global_libctx;
-
 /*
  * Class:     OpenSSLMD
  * Method:    doInit0
@@ -30,9 +28,12 @@ extern OSSL_LIB_CTX *global_libctx;
 JNIEXPORT jlong JNICALL Java_com_canonical_openssl_md_OpenSSLMD_doInit0
   (JNIEnv *env, jobject this, jstring algorithm) {
     const char *algorithm_str = jstring_to_char_array(env, algorithm);
+    if (algorithm_str == NULL) {
+        return 0;
+    }
     int oom = 0;
-    md_context *ctx = md_init(global_libctx, algorithm_str, &oom);
-    (*env)->ReleaseStringUTFChars(env, algorithm, algorithm_str);
+    md_context *ctx = md_init(jssl_libctx(), algorithm_str, &oom);
+    release_jstring(env, algorithm, algorithm_str);
     if (ctx == NULL) {
         if (oom)
             throwOOM(env, "Out of memory initializing digest");
@@ -52,11 +53,14 @@ JNIEXPORT void JNICALL Java_com_canonical_openssl_md_OpenSSLMD_doUpdate0
   (JNIEnv *env, jobject this, jbyteArray data) {
     md_context *ctx = (md_context*) get_long_field(env, this, "nativeHandle");
     byte *data_array = jbyteArray_to_byte_array(env, data);
+    if (data_array == NULL) {
+        return;
+    }
     int length = array_length(env, data);
     if (md_update(ctx, data_array, length) != SUCCESS) {
         throwProviderException(env, "Digest update failed");
     }
-    (*env)->ReleaseByteArrayElements(env, data, (jbyte *)data_array, JNI_ABORT);
+    release_jbyteArray(env, data, data_array);
 }
 
 /*

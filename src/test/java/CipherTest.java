@@ -17,6 +17,7 @@
 import javax.crypto.Cipher;
 import java.security.Key;
 import java.security.Security;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
 import javax.crypto.spec.IvParameterSpec;
@@ -393,4 +394,86 @@ public class CipherTest {
 
         assertArrayEquals("Invalid secret key " + (nameKeySizeAndMode + "/" +  padding), sk1.getEncoded(), sk2.getEncoded());
     }
+
+    @Test
+    public void testAEADDecryptMultipleUpdates() throws Exception {
+        for (String cipher : new String[]{"AES128/GCM", "AES192/GCM", "AES256/GCM"}) {
+            for (String padding : paddings) {
+                runTestAEADDecryptMultipleUpdates(cipher, padding);
+            }
+        }
+    }
+
+    // Encrypts with a single doFinal, then decrypts by feeding the ciphertext
+    // in three chunks via update()/update()/doFinal() to exercise the AEAD
+    // decrypt accumulation buffer.
+    private void runTestAEADDecryptMultipleUpdates(String nameKeySizeAndMode, String padding)
+            throws Exception {
+        String cipherName = nameKeySizeAndMode + "/" + padding;
+        SecureRandom sr = SecureRandom.getInstance("NativePRNG");
+
+        int keyBytes = nameKeySizeAndMode.contains("256") ? 32
+                     : nameKeySizeAndMode.contains("192") ? 24 : 16;
+        byte[] key = new byte[keyBytes];
+        sr.nextBytes(key);
+        SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+
+        byte[] iv = new byte[12];
+        sr.nextBytes(iv);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+
+        byte[] plaintext = new byte[48];
+        sr.nextBytes(plaintext);
+        String aad = "additional authentication data";
+
+        Cipher enc = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+        enc.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec, sr);
+        enc.updateAAD(aad.getBytes());
+        byte[] ciphertext = enc.doFinal(plaintext);
+
+        // Split ciphertext across two update() calls; remainder goes to doFinal().
+        int chunk = ciphertext.length / 3;
+        Cipher dec = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+        dec.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec, sr);
+        dec.updateAAD(aad.getBytes());
+        dec.update(ciphertext, 0, chunk);
+        dec.update(ciphertext, chunk, chunk);
+        byte[] result = dec.doFinal(ciphertext, 2 * chunk, ciphertext.length - 2 * chunk);
+
+        assertArrayEquals("AEAD multi-update decrypt failed for " + cipherName, plaintext, result);
+    }
+
+    @Test
+    public void testDoFinalNoInputAfterUpdate() throws Exception {
+        SecureRandom sr = SecureRandom.getInstance("NativePRNG");
+
+        byte[] key = new byte[16];
+        sr.nextBytes(key);
+        byte[] iv = new byte[16];
+        sr.nextBytes(iv);
+        AlgorithmParameterSpec spec = new IvParameterSpec(iv);
+
+        byte[] plaintext = new byte[64];
+        sr.nextBytes(plaintext);
+
+        Cipher enc = Cipher.getInstance("AES128/CBC/PKCS7", "OpenSSLFIPSProvider");
+        enc.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
+        byte[] ciphertext = concat(enc.update(plaintext), enc.doFinal());
+
+        Cipher dec = Cipher.getInstance("AES128/CBC/PKCS7", "OpenSSLFIPSProvider");
+        dec.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), spec, sr);
+        byte[] result = concat(dec.update(ciphertext), dec.doFinal());
+
+        assertArrayEquals("doFinal() with no input after update must not throw NPE", plaintext, result);
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+        int la = a == null ? 0 : a.length;
+        int lb = b == null ? 0 : b.length;
+        byte[] out = new byte[la + lb];
+        if (la > 0) System.arraycopy(a, 0, out, 0, la);
+        if (lb > 0) System.arraycopy(b, 0, out, la, lb);
+        return out;
+    }
 }
+

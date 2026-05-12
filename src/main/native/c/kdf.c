@@ -156,16 +156,16 @@ static void populate_hkdf_params(OSSL_PARAM *ossl_params, kdf_spec *spec, kdf_pa
     ossl_params[nparams++] = OSSL_PARAM_construct_end();
 }
 
-static void populate_params(OSSL_PARAM *ossl_params, kdf_spec *spec, kdf_params *params, kdf_type type) {
+static jssl_status populate_params(OSSL_PARAM *ossl_params, kdf_spec *spec, kdf_params *params, kdf_type type) {
     switch (type) {
         case PBKDF2:
-            populate_pbkdf2_params(ossl_params, spec, params);           
-            break;
+            populate_pbkdf2_params(ossl_params, spec, params);
+            return SUCCESS;
         case HKDF:
             populate_hkdf_params(ossl_params, spec, params);
-            break;
+            return SUCCESS;
         default:
-            printf("Not supported yet.\n");
+            return FAIL_OPERATION_UNSUPPORTED;
     }
 }
 
@@ -182,11 +182,13 @@ static char *get_kdf_name(kdf_type type) {
     
 jssl_status kdf_derive(OSSL_LIB_CTX *libctx, kdf_spec *spec, kdf_params *params, byte *keydata, int keylength, kdf_type type) {
     OSSL_PARAM ossl_params[8];
-    populate_params(ossl_params, spec, params, type);
+    jssl_status ret = populate_params(ossl_params, spec, params, type);
+    if (ret != SUCCESS) {
+        return ret;
+    }
 
     EVP_KDF *kdf = NULL;
     EVP_KDF_CTX *kctx = NULL;
-    jssl_status ret = SUCCESS;
 
     kdf = EVP_KDF_fetch(libctx, get_kdf_name(type), NULL);
     if (kdf == NULL) {

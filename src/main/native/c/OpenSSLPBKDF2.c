@@ -19,22 +19,33 @@
 #include "OpenSSLPBKDF2.h"
 #include <openssl/crypto.h>
 
-#define MAX_KEY_SIZE 64
-extern OSSL_LIB_CTX *global_libctx;
+#define MAX_KEY_SIZE 256
 /*
- * Class:     OpenSSLPBKDF2Spi
- * Method:    generateKey0
- * Signature: ([C[BI)LOpenSSLPBKDF2Spi/PBKDF2SecretKey;
+ * Class:     com_canonical_openssl_kdf_OpenSSLPBKDF2
+ * Method:    generateSecret0
+ * Signature: ([C[BII)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_kdf_OpenSSLPBKDF2_generateSecret0
-  (JNIEnv *env, jobject this, jcharArray password, jbyteArray salt, jint iteration_count) {
+  (JNIEnv *env, jobject this, jcharArray password, jbyteArray salt, jint iteration_count, jint key_length) {
+    if (key_length <= 0 || key_length > MAX_KEY_SIZE) {
+        throwProviderException(env, "Invalid PBKDF2 key length");
+        return NULL;
+    }
+
     int password_length = (*env)->GetArrayLength(env, password);
     int salt_length = array_length(env, salt);
     byte output[MAX_KEY_SIZE] = {0};
     jbyteArray result = NULL;
 
     jchar *password_chars = (*env)->GetCharArrayElements(env, password, NULL);
+    if (password_chars == NULL) {
+        return NULL;
+    }
     jbyte *salt_bytes = (*env)->GetByteArrayElements(env, salt, NULL);
+    if (salt_bytes == NULL) {
+        (*env)->ReleaseCharArrayElements(env, password, password_chars, JNI_ABORT);
+        return NULL;
+    }
 
     kdf_spec *spec = create_pbkdf_spec((byte *)password_chars, password_length * sizeof(jchar),
                         (byte *)salt_bytes, salt_length, iteration_count);
@@ -54,12 +65,17 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_kdf_OpenSSLPBKDF2_genera
         return NULL;
     }
 
-    if (kdf_derive(global_libctx, spec, params, output, MAX_KEY_SIZE, PBKDF2) == SUCCESS) {
-        result = byte_array_to_jbyteArray(env, output, MAX_KEY_SIZE);
+    if (kdf_derive(jssl_libctx(), spec, params, output, key_length, PBKDF2) == SUCCESS) {
+        result = byte_array_to_jbyteArray(env, output, key_length);
     }
 
-    OPENSSL_cleanse(output, MAX_KEY_SIZE);
+    OPENSSL_cleanse(output, sizeof(output));
     free_kdf_spec(&spec, PBKDF2);
     free_kdf_params(&params, PBKDF2);
     return result;
+}
+
+JNIEXPORT jint JNICALL Java_com_canonical_openssl_kdf_OpenSSLPBKDF2_getMaxKeyLengthBytes0
+  (JNIEnv *env, jclass cls) {
+    return MAX_KEY_SIZE;
 }

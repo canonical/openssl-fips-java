@@ -20,6 +20,7 @@ import com.canonical.openssl.util.NativeMemoryCleaner;
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
 import java.util.concurrent.atomic.AtomicLong;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
@@ -41,8 +42,8 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
         NativeLibraryLoader.load();
     }
 
-    public static int AGREEMENT_DH = 0;
-    public static int AGREEMENT_ECDH = 1;
+    public static final int AGREEMENT_DH = 0;
+    public static final int AGREEMENT_ECDH = 1;
 
     enum State { UNINITIALIZED, INITIALIZED, PEER_KEY_ADDED };
     private State state = State.UNINITIALIZED;
@@ -66,15 +67,22 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
     private static Cleaner cleaner = NativeMemoryCleaner.cleaner;
     private Cleaner.Cleanable cleanable;
 
-    protected Key engineDoPhase(Key key, boolean lastPhase) {
+    protected Key engineDoPhase(Key key, boolean lastPhase) throws InvalidKeyException {
         if (state == State.UNINITIALIZED) {
             throw new IllegalStateException("The KeyAgreement is not initialized yet");
         }
+        if (key == null) {
+            throw new InvalidKeyException("Key must not be null");
+        }
         byte[] encoded = key.getEncoded();
         if (encoded == null) {
-            throw new IllegalArgumentException("Key does not support encoding");
+            throw new InvalidKeyException("Key does not support encoding");
         }
-        engineDoPhase0(encoded);
+        try {
+            engineDoPhase0(encoded);
+        } finally {
+            Arrays.fill(encoded, (byte) 0);
+        }
         state = State.PEER_KEY_ADDED;
         return null;
     }
@@ -87,8 +95,12 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
 
     protected int engineGenerateSecret(byte[] sharedSecret, int offset) {
         byte[] secret = engineGenerateSecret();
-        System.arraycopy(secret, 0, sharedSecret, offset, secret.length);
-        return secret.length;
+        try {
+            System.arraycopy(secret, 0, sharedSecret, offset, secret.length);
+            return secret.length;
+        } finally {
+            Arrays.fill(secret, (byte)0);
+        }
     }
 
     protected SecretKey engineGenerateSecret(String algorithm) throws NoSuchAlgorithmException, InvalidKeyException {
@@ -100,12 +112,18 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
         }
     }
 
-    protected void engineInit(Key key, AlgorithmParameterSpec params, SecureRandom random) {
-        // TODO: ignore random for now, does DH or ECDH use any kind of randomness?
-        throw new UnsupportedOperationException ("prototype: KeyAgreement.init() with AlgorithmParameterSpec is unsupported");
+    protected void engineInit(Key key, AlgorithmParameterSpec params, SecureRandom random) throws InvalidKeyException, InvalidAlgorithmParameterException {
+        if (params != null) {
+            throw new InvalidAlgorithmParameterException(
+                "AlgorithmParameterSpec is not supported; the key's own parameters are used");
+        }
+        engineInit(key, random);
     }
 
-    protected void engineInit(Key key, SecureRandom random) {
+    protected void engineInit(Key key, SecureRandom random) throws InvalidKeyException {
+        if (key == null) {
+            throw new InvalidKeyException("Key must not be null");
+        }
 	// This is needed if the KeyAgreement is reused.
         if (cleanable != null) {
             cleanable.clean();

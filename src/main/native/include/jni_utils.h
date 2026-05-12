@@ -51,4 +51,6 @@ jlong invokeLongMethod(JNIEnv *env, jobject this, const char *name, const char *
 void throwOOM(JNIEnv *env, const char *message);
 
 void throwProviderException(JNIEnv *env, const char *message);
+
+void throwIllegalArgument(JNIEnv *env, const char *message);
 #endif //_INCLUDE_JNI_UTILS_H

@@ -22,7 +22,7 @@ BUILD     := ${TOPDIR}/build
 JAVA_SRC      := src/main/java/com/canonical/openssl
 JAVA_SRC_DIRS := ${JAVA_SRC} ${JAVA_SRC}/drbg ${JAVA_SRC}/keyagreement ${JAVA_SRC}/keyencapsulation ${JAVA_SRC}/mac
 JAVA_SRC_DIRS += ${JAVA_SRC}/kdf ${JAVA_SRC}/md ${JAVA_SRC}/signature ${JAVA_SRC}/key ${JAVA_SRC}/cipher
-JAVA_SRC_DIRS += ${JAVA_SRC}/provider ${JAVA_SRC}/util
+JAVA_SRC_DIRS += ${JAVA_SRC}/provider ${JAVA_SRC}/util ${JAVA_SRC}/keypairgenerator
 JAVA_FILES    = $(wildcard $(addsuffix /*.java, $(JAVA_SRC_DIRS)))
 
 # Vars for compiling the C sources
@@ -36,8 +36,18 @@ NATFILES := $(foreach dir,$(NATDIR),$(wildcard $(dir)/*.c))
 OBJS  := $(patsubst $(NATDIR)/%.c, $(BUILD)/bin/%.o, $(NATFILES))
 
 
-CCFLAGS := ${INCLUDE_HEADERS} -c -fPIC -g
-LDFLAGS := -shared -fPIC -Wl,-soname,libjssl.so
+DEBUG ?= 0
+ifeq ($(DEBUG),1)
+    DEBUG_CFLAGS := -g
+else
+    DEBUG_CFLAGS :=
+endif
+
+HARDENING_CFLAGS  := -O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -D_GNU_SOURCE -Wall -Wformat -Wformat-security
+HARDENING_LDFLAGS := -Wl,-z,relro,-z,now
+
+CCFLAGS := ${INCLUDE_HEADERS} -c -fPIC ${HARDENING_CFLAGS} ${DEBUG_CFLAGS}
+LDFLAGS := -shared -fPIC ${HARDENING_LDFLAGS} -Wl,-soname,libjssl.so
 SOLIB   := $(BUILD)/bin/libjssl.so
 
 # Vars for compiling the test sources

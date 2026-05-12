@@ -16,6 +16,8 @@
  */
 package com.canonical.openssl.mac;
 
+import java.security.spec.AlgorithmParameterSpec;
+
 public final class KMAC256 extends OpenSSLMAC {
     protected String getAlgorithm() {
         return "KMAC-256";
@@ -29,8 +31,12 @@ public final class KMAC256 extends OpenSSLMAC {
         return null;
     }
 
-    protected byte[] getIV() {
+    protected byte[] getIV(AlgorithmParameterSpec spec) {
         return null;
+    }
+
+    protected int getDefaultMacLength() {
+        return 64;
     }
 }
 

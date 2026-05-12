@@ -164,7 +164,11 @@ final public class OpenSSLKEMRSA implements KEMSpi {
             if (encoded == null) {
                 throw new InvalidKeyException("Key does not support encoding");
             }
-            nativeHandle = decapsulatorInit0(encoded);
+            try {
+                nativeHandle = decapsulatorInit0(encoded);
+            } finally {
+                Arrays.fill(encoded, (byte) 0);
+            }
             cleanable = cleaner.register(this, new DecapsulatorState(nativeHandle));
             if (nativeHandle == 0) {
                 throw new InvalidKeyException("Failed to initialize RSA-KEM decapsulator");

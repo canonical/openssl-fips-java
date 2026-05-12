@@ -16,7 +16,15 @@
  */
 package com.canonical.openssl.mac;
 
+import java.security.InvalidAlgorithmParameterException;
+import java.security.spec.AlgorithmParameterSpec;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
+
 public final class GMACWithAes128GCM extends OpenSSLMAC {
+
+    private static final int NONCE_LEN = 12;
+
     protected String getAlgorithm() {
         return "GMAC";
     }
@@ -29,10 +37,24 @@ public final class GMACWithAes128GCM extends OpenSSLMAC {
         return null;
     }
 
-    // TODO: a random IV?
-    protected byte[] getIV() {
-        return new byte[] { (byte)0xe0, (byte)0xe0, (byte)0x0f, (byte)0x19,
-                            (byte)0xfe, (byte)0xd7, (byte)0xba, (byte)0x01,
-                            (byte)0x36, (byte)0xa7, (byte)0x97, (byte)0xf3 };
+    protected byte[] getIV(AlgorithmParameterSpec spec) throws InvalidAlgorithmParameterException {
+        byte[] iv;
+        if (spec instanceof IvParameterSpec ivSpec) {
+            iv = ivSpec.getIV();
+        } else if (spec instanceof GCMParameterSpec gcmSpec) {
+            iv = gcmSpec.getIV();
+        } else {
+            throw new InvalidAlgorithmParameterException(
+                "GMAC requires an IvParameterSpec or GCMParameterSpec carrying a " + NONCE_LEN + "-byte nonce");
+        }
+        if (iv == null || iv.length != NONCE_LEN) {
+            throw new InvalidAlgorithmParameterException(
+                "GMAC nonce must be exactly " + NONCE_LEN + " bytes");
+        }
+        return iv.clone();
+    }
+
+    protected int getDefaultMacLength() {
+        return 16;
     }
 }

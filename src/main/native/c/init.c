@@ -14,16 +14,25 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include "jssl.h" 
+#include "jssl.h"
 #include <openssl/crypto.h>
-#include <openssl/err.h>
+#include <openssl/evp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "jni.h"
 
-/* Global libctx handle. Will be initializaed in JNI_OnLoad */
-OSSL_LIB_CTX *global_libctx = NULL;
-OSSL_PROVIDER *pbase, *pfips;
+static OSSL_LIB_CTX *global_libctx = NULL;
+static OSSL_PROVIDER *pbase, *pfips;
+
+/* A NULL ctx here means JNI_OnLoad did not run; not reachable in normal use. */
+OSSL_LIB_CTX* jssl_libctx(void) {
+    OSSL_LIB_CTX *ctx = __atomic_load_n(&global_libctx, __ATOMIC_ACQUIRE);
+    if (ctx == NULL) {
+        fputs("jssl: global_libctx is NULL; JNI_OnLoad did not run or memory is corrupted\n", stderr);
+        abort();
+    }
+    return ctx;
+}
 
 /* Loading the FIPS provider is often not enough to get openssl's full functionality.
    We also should load the base provider. The base provider does not provide for
@@ -45,17 +54,14 @@ OSSL_LIB_CTX* load_openssl_provider(const char *name, const char* conf_file_path
     }
 
     if (!OSSL_LIB_CTX_load_config(libctx, conf_file_path)) {
-        ERR_print_errors_fp(stderr);
-	OSSL_LIB_CTX_free(libctx);
-	return NULL;
+        OSSL_LIB_CTX_free(libctx);
+        return NULL;
     }
 
     OSSL_PROVIDER *prov = OSSL_PROVIDER_load(libctx, name);
     if (NULL == prov) {
-        fprintf(stderr, "Failed to load the %s provider:\n", name);
-        ERR_print_errors_fp(stderr);
-	OSSL_LIB_CTX_free(libctx);
-	return NULL;
+        OSSL_LIB_CTX_free(libctx);
+        return NULL;
     }
 
     if (strcmp("fips", name) == 0) {
@@ -67,7 +73,15 @@ OSSL_LIB_CTX* load_openssl_provider(const char *name, const char* conf_file_path
 }
 
 OSSL_LIB_CTX* load_openssl_fips_provider(const char* conf_file_path) {
-    return load_openssl_provider("fips", conf_file_path);
+    OSSL_LIB_CTX *libctx = load_openssl_provider("fips", conf_file_path);
+    if (libctx == NULL) {
+        return NULL;
+    }
+    if (!EVP_set_default_properties(libctx, "fips=yes")) {
+        unload_libctx(libctx);
+        return NULL;
+    }
+    return libctx;
 }
 
 OSSL_LIB_CTX* load_openssl_base_provider(const char* conf_file_path) {
@@ -82,28 +96,26 @@ void unload_libctx(OSSL_LIB_CTX *libctx) {
 }
 
 static void unload_global_libctx() {
-    unload_libctx(global_libctx);
+    OSSL_LIB_CTX *ctx = __atomic_exchange_n(&global_libctx, NULL, __ATOMIC_ACQ_REL);
+    unload_libctx(ctx);
 }
 
 int JNI_OnLoad(JavaVM* vm, void *reserved) {
     const char *default_cnf = "/usr/local/ssl/openssl.cnf";
-    const char *custom_cnf = getenv("OPENSSL_CUSTOM_CONF");
+    const char *custom_cnf = secure_getenv("OPENSSL_CUSTOM_CONF");
     const char *conf = custom_cnf != NULL ? custom_cnf : default_cnf;
-    global_libctx = load_openssl_fips_provider(conf);
-    if (global_libctx == NULL) {
-        fprintf(stderr, "Failed to load FIPS provider from %s\n", conf);
+    OSSL_LIB_CTX *ctx = load_openssl_fips_provider(conf);
+    if (ctx == NULL) {
         return JNI_ERR;
     }
-    if (!OSSL_PROVIDER_available(global_libctx, "base")) {
-        pbase = OSSL_PROVIDER_load(global_libctx, "base");
+    if (!OSSL_PROVIDER_available(ctx, "base")) {
+        pbase = OSSL_PROVIDER_load(ctx, "base");
         if (pbase == NULL) {
-            fprintf(stderr, "Failed to load base provider\n");
-            ERR_print_errors_fp(stderr);
-            unload_global_libctx();
-            global_libctx = NULL;
+            unload_libctx(ctx);
             return JNI_ERR;
         }
     }
+    __atomic_store_n(&global_libctx, ctx, __ATOMIC_RELEASE);
     return JNI_VERSION_10;
 }
 

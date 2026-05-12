@@ -21,7 +21,6 @@
 #include "evp_utils.h"
 #include "jni_utils.h"
 
-extern OSSL_LIB_CTX *global_libctx;
 /*
  * Class:     OpenSSLKEMRSA_RSAKEMDecapsulator
  * Method:    decapsulatorInit0
@@ -30,10 +29,13 @@ extern OSSL_LIB_CTX *global_libctx;
 JNIEXPORT jlong JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA_00024RSAKEMDecapsulator_decapsulatorInit0
   (JNIEnv *env, jobject this, jbyteArray key) {
     byte* bytes = jbyteArray_to_byte_array(env, key);
+    if (bytes == NULL) {
+        return 0;
+    }
     int length = array_length(env, key);
-    EVP_PKEY *private_key = decode_private_key_fips(bytes, length, global_libctx);
-    (*env)->ReleaseByteArrayElements(env, key, (jbyte*)bytes, JNI_ABORT);
-    kem_keyspec *spec = init_kem_keyspec_with_key(NULL, private_key, global_libctx);
+    EVP_PKEY *private_key = decode_private_key_fips(bytes, length, jssl_libctx());
+    release_jbyteArray(env, key, bytes);
+    kem_keyspec *spec = init_kem_keyspec_with_key(NULL, private_key, jssl_libctx());
     if (spec == NULL) {
         throwOOM(env, "Could not allocate KEM keyspec");
         return 0;
@@ -50,10 +52,13 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSL
   (JNIEnv *env, jobject this, jbyteArray encapsulated) {
     kem_keyspec *spec = (kem_keyspec*)get_long_field(env, this, "nativeHandle");
     byte* bytes = jbyteArray_to_byte_array(env, encapsulated);
+    if (bytes == NULL) {
+        return NULL;
+    }
     int length = array_length(env, encapsulated);
     set_wrapped_key(spec, bytes, length);
     jssl_status rc = unwrap(spec);
-    (*env)->ReleaseByteArrayElements(env, encapsulated, (jbyte*)bytes, JNI_ABORT);
+    release_jbyteArray(env, encapsulated, bytes);
     spec->wrapped_key = NULL;
     spec->wrapped_key_length = 0;
     if (rc == FAIL_OOM) {

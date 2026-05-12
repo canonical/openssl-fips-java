@@ -21,8 +21,6 @@
 #include "evp_utils.h"
 #include "jni_utils.h"
 
-extern OSSL_LIB_CTX *global_libctx;
-
 /*
  * Class:     OpenSSLKEMRSA_RSAKEMEncapsulator
  * Method:    encapsulatorInit0
@@ -31,10 +29,13 @@ extern OSSL_LIB_CTX *global_libctx;
 JNIEXPORT jlong JNICALL Java_com_canonical_openssl_keyencapsulation_OpenSSLKEMRSA_00024RSAKEMEncapsulator_encapsulatorInit0
   (JNIEnv *env, jobject this, jbyteArray key) {
     byte* bytes = jbyteArray_to_byte_array(env, key);
+    if (bytes == NULL) {
+        return 0;
+    }
     int length = array_length(env, key);
-    EVP_PKEY *public_key = decode_public_key_fips(bytes, length, global_libctx);
-    (*env)->ReleaseByteArrayElements(env, key, (jbyte*)bytes, JNI_ABORT);
-    kem_keyspec *spec = init_kem_keyspec_with_key(public_key, NULL, global_libctx);
+    EVP_PKEY *public_key = decode_public_key_fips(bytes, length, jssl_libctx());
+    release_jbyteArray(env, key, bytes);
+    kem_keyspec *spec = init_kem_keyspec_with_key(public_key, NULL, jssl_libctx());
     if (spec == NULL) {
         throwOOM(env, "Could not allocate KEM keyspec");
         return 0;

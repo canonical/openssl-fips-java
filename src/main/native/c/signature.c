@@ -16,7 +16,7 @@
  */
 #include "signature.h"
 #include "jssl.h"
-#include <openssl/err.h>
+#include <stdint.h>
 #include <openssl/rsa.h>
 #include <openssl/core_names.h>
 
@@ -28,7 +28,6 @@ sv_key *sv_init_key(OSSL_LIB_CTX *libctx, EVP_PKEY *pkey, int *oom) {
     }
     key->ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey, NULL);
     if (key->ctx == NULL) {
-        ERR_print_errors_fp(stderr);
         free(key);
         return NULL;
     }
@@ -108,6 +107,7 @@ sv_context *sv_init(OSSL_LIB_CTX *libctx, sv_key *key, sv_params *params, sv_sta
     new_context->key = key;
     new_context->data = NULL;
     new_context->length = 0;
+    new_context->capacity = 0;
     new_context->mctx = md_ctx;
     return new_context;
 
@@ -118,27 +118,40 @@ error:
 
 int sv_update(sv_context *ctx, byte *data, size_t length) {
     if (ctx->type == SV_ED25519 || ctx->type == SV_ED448) {
-        // Ed25519/Ed448 are one-shot: the message is consumed at sv_sign /
-        // sv_verify time, so the buffer must outlive this call. The caller's
-        // `data` is freed as soon as this function returns, so take a copy.
-        byte *buf = NULL;
-        if (length > 0) {
-            buf = (byte *)malloc(length);
-            if (buf == NULL) return 0;
-            memcpy(buf, data, length);
+        if (length == 0) {
+            return 1;
         }
-        free(ctx->data);
-        ctx->data = buf;
-        ctx->length = length;
+        if (length > SIZE_MAX - ctx->length) {
+            return 0;
+        }
+        size_t new_length = ctx->length + length;
+        if (new_length > ctx->capacity) {
+            size_t new_cap = ctx->capacity ? ctx->capacity : 256;
+            while (new_cap < new_length) {
+                if (new_cap > SIZE_MAX / 2) {
+                    new_cap = new_length;
+                    break;
+                }
+                new_cap <<= 1;
+            }
+            byte *buf = (byte *)realloc(ctx->data, new_cap);
+            if (buf == NULL) {
+                return 0;
+            }
+            ctx->data = buf;
+            ctx->capacity = new_cap;
+        }
+        memcpy(ctx->data + ctx->length, data, length);
+        ctx->length = new_length;
         return 1;
     }
 
-    if (ctx->state == SIGN && (EVP_DigestSignUpdate(ctx->mctx, data, length) < 0)) {
+    if (ctx->state == SIGN && (EVP_DigestSignUpdate(ctx->mctx, data, length) <= 0)) {
         return 0;
     }
 
-    if(ctx->state == VERIFY && (EVP_DigestVerifyUpdate(ctx->mctx, data, length) < 0)) {
-        return 0; 
+    if(ctx->state == VERIFY && (EVP_DigestVerifyUpdate(ctx->mctx, data, length) <= 0)) {
+        return 0;
     }
 
     return 1;

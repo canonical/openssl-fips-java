@@ -15,8 +15,6 @@
  *
  */
 #include "cipher.h"
-#include <openssl/err.h>
-#include <stdio.h>
 
 static inline int is_mode_CCM(cipher_context *ctx) {
     const char* suffix = NULL;
@@ -46,27 +44,7 @@ static inline int is_op_decrypt(cipher_context *ctx) {
     return ctx != NULL && ctx->op_mode == OP_DECRYPT;
 }
 
-#define MAX_CIPHER_TABLE_SIZE 256
 #define TAG_LEN 16
-
-void print_byte_array(byte *array, int length) {
-    printf("[ ");
-    for (int i = 0; i < length; i++) {
-        printf("%d", array[i]);
-        if (i < length-1) {
-            printf(", ");
-        }
-    }
-    printf(" ]\n");
-}
- 
-typedef struct name_cipher_map {
-    const char *name;
-    const EVP_CIPHER *cipher;
-} name_cipher_map;
-
-static name_cipher_map cipher_table[MAX_CIPHER_TABLE_SIZE];
-static int table_size;
 
 int get_padding_code(const char *name) {
     if (name == NULL || str_equal(name, "NONE")) {
@@ -80,9 +58,7 @@ int get_padding_code(const char *name) {
     } else if (str_equal(name, "ISO7816-4")) {
         return EVP_PADDING_ISO7816_4;
     } else {
-        // TODO: handle an supported padding scheme
-        // TEMP: disable padding :-(
-        return 0;
+        return -1;
     }
 }
 
@@ -97,20 +73,22 @@ cipher_context* create_cipher_context(OSSL_LIB_CTX *libctx, const char *name, co
     if (new_ctx == NULL) {
         goto error;
     }
+    new_context->context = new_ctx;
 
-    EVP_CIPHER_CTX_init(new_ctx);
     new_context->name = strdup(name);
     if (new_context->name == NULL) {
         goto error;
     }
-    new_context->context = new_ctx;
     new_context->cipher = EVP_CIPHER_fetch(libctx, name, NULL);
-    if (new_context->cipher == NULL || new_context->context == NULL) {
+    if (new_context->cipher == NULL) {
         goto error;
     }
 
     new_context->op_mode = OP_UNDEFINED;
     new_context->padding = get_padding_code(padding_name);
+    if (new_context->padding < 0) {
+        goto error;
+    }
     memset(new_context->gcm_tag, 0, GCM_TAG_LEN);
     new_context->key = NULL;
     new_context->iv = NULL;
@@ -124,6 +102,27 @@ error:
 
 jssl_status cipher_init(cipher_context *ctx, byte in_buf[], int in_len, unsigned char *key, int key_len, unsigned char *iv, int iv_len, int op_mode) {
     jssl_status ret = FAIL_OOM;
+
+    if (is_mode_CCM(ctx) && op_mode != OP_ENCRYPT && in_len < TAG_LEN) {
+        return FAIL_EVP;
+    }
+
+    if (ctx->key != NULL) {
+        OPENSSL_cleanse(ctx->key, ctx->key_len);
+        free(ctx->key);
+        ctx->key = NULL;
+        ctx->key_len = 0;
+    }
+    if (ctx->iv != NULL) {
+        OPENSSL_cleanse(ctx->iv, ctx->iv_len);
+        free(ctx->iv);
+        ctx->iv = NULL;
+        ctx->iv_len = 0;
+    }
+    if (ctx->initial_bytes != NULL) {
+        free(ctx->initial_bytes);
+        ctx->initial_bytes = NULL;
+    }
 
     if (key != NULL) {
         ctx->key = (unsigned char *) malloc(key_len);
@@ -147,21 +146,25 @@ jssl_status cipher_init(cipher_context *ctx, byte in_buf[], int in_len, unsigned
 
     ret = FAIL_EVP;
     if (!EVP_CipherInit_ex(ctx->context, ctx->cipher, NULL, NULL, NULL, op_mode)) {
-        ERR_print_errors_fp(stderr);
         goto error;
     }
 
     ctx->op_mode = op_mode;
     if (is_mode_CCM(ctx)) {
-        EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_SET_IVLEN, iv_len, 0);
-        EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_SET_TAG, TAG_LEN, op_mode == OP_ENCRYPT ? 0 : (in_buf + in_len - TAG_LEN));
+        if (EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_SET_IVLEN, iv_len, 0) <= 0) {
+            goto error;
+        }
+        if (EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_SET_TAG, TAG_LEN, op_mode == OP_ENCRYPT ? 0 : (in_buf + in_len - TAG_LEN)) <= 0) {
+            goto error;
+        }
     }
 
     if (!EVP_CipherInit_ex(ctx->context, NULL, NULL, ctx->key, ctx->iv, op_mode)) {
-        ERR_print_errors_fp(stderr);
         goto error;
     }
-    EVP_CIPHER_CTX_set_padding(ctx->context, ctx->padding);
+    if (EVP_CIPHER_CTX_set_padding(ctx->context, ctx->padding) <= 0) {
+        goto error;
+    }
     return SUCCESS;
 
 error:
@@ -192,14 +195,12 @@ jssl_status cipher_update_aad(cipher_context *ctx, int *out_len_ptr, byte aad_bu
 jssl_status cipher_update(cipher_context *ctx, byte out_buf[], int *out_len_ptr, byte in_buf[], int in_len) {
     if (is_mode_CCM(ctx)) {
         if (!EVP_CipherUpdate(ctx->context, NULL, out_len_ptr, NULL, is_op_decrypt(ctx) ? in_len-TAG_LEN : in_len)) {
-            ERR_print_errors_fp(stderr);
 	    return FAIL_EVP;
 	}
     }
 
     if (!EVP_CipherUpdate(ctx->context, out_buf, out_len_ptr, in_buf,
                         (is_mode_CCM(ctx) && is_op_decrypt(ctx)) ? in_len-TAG_LEN : in_len)) {
-        ERR_print_errors_fp(stderr);
 	return FAIL_EVP;
     }
     return SUCCESS;
@@ -207,20 +208,25 @@ jssl_status cipher_update(cipher_context *ctx, byte out_buf[], int *out_len_ptr,
 
 jssl_status cipher_do_final(cipher_context *ctx, byte *out_buf, int *out_len_ptr) {
     if (ctx->op_mode == OP_DECRYPT && is_mode_GCM(ctx)) {
-        EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_GCM_SET_TAG, TAG_LEN, ctx->gcm_tag);
+        if (EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_GCM_SET_TAG, TAG_LEN, ctx->gcm_tag) <= 0) {
+            return FAIL_EVP;
+        }
     }
 
     if (!EVP_CipherFinal_ex(ctx->context, out_buf, out_len_ptr)) {
-        ERR_print_errors_fp(stderr);
         return FAIL_EVP;
     }
 
     if (ctx->op_mode == OP_ENCRYPT) {
         if(is_mode_CCM(ctx)) {
             *out_len_ptr = TAG_LEN;
-            EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_GET_TAG, TAG_LEN, out_buf);
+            if (EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_CCM_GET_TAG, TAG_LEN, out_buf) <= 0) {
+                return FAIL_EVP;
+            }
         } else if(is_mode_GCM(ctx)) {
-            EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_GCM_GET_TAG, TAG_LEN, out_buf + *out_len_ptr);
+            if (EVP_CIPHER_CTX_ctrl(ctx->context, EVP_CTRL_GCM_GET_TAG, TAG_LEN, out_buf + *out_len_ptr) <= 0) {
+                return FAIL_EVP;
+            }
             *out_len_ptr += TAG_LEN;
         }
     }

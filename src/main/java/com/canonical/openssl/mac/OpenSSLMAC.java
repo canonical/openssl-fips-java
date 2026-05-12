@@ -21,9 +21,11 @@ import com.canonical.openssl.util.NativeLibraryLoader;
 import java.lang.ref.Cleaner;
 import java.util.concurrent.atomic.AtomicLong;
 import java.nio.ByteBuffer;
+import java.security.InvalidKeyException;
 import java.security.Key;
 import java.util.Arrays;
 import javax.crypto.MacSpi;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.spec.AlgorithmParameterSpec;
 import javax.xml.crypto.dsig.spec.HMACParameterSpec;
 
@@ -74,36 +76,52 @@ public abstract class OpenSSLMAC extends MacSpi {
     protected abstract String getAlgorithm();
     protected abstract String getCipherType();
     protected abstract String getDigestType();
-    protected abstract byte[] getIV();
+    protected abstract byte[] getIV(AlgorithmParameterSpec spec) throws InvalidAlgorithmParameterException;
+    protected abstract int getDefaultMacLength();
 
     private static Cleaner cleaner = NativeMemoryCleaner.cleaner;
     private MACState macState;
     private Cleaner.Cleanable cleanable;
     private int outputLength = -1;
     private byte[] keyBytes;
+    private byte[] cachedIV;
 
     @Override
     protected byte[] engineDoFinal() {
+        if (nativeHandle == 0) {
+            throw new IllegalStateException("MAC not initialized");
+        }
         return doFinal0();
     }
 
     @Override
     protected int engineGetMacLength() {
+        if (nativeHandle == 0) {
+            return outputLength > 0 ? outputLength : getDefaultMacLength();
+        }
         return getMacLength();
     }
 
     @Override
-    protected void engineInit(Key key, AlgorithmParameterSpec spec) {
+    protected void engineInit(Key key, AlgorithmParameterSpec spec) throws InvalidKeyException, InvalidAlgorithmParameterException {
+        if (key == null) {
+            throw new InvalidKeyException("Key must not be null");
+        }
         if (spec != null && isHMAC(this) && spec instanceof HMACParameterSpec hmacSpec) {
             this.outputLength = hmacSpec.getOutputLength();
         }
         byte[] newKeyBytes = key.getEncoded();
+        if (newKeyBytes == null) {
+            throw new InvalidKeyException("Key does not support encoding");
+        }
+        byte[] iv = getIV(spec);
         // clean() zeros the old keyBytes array (held by the old MACState) and frees the old handle
         if (cleanable != null) {
             cleanable.clean();
         }
         this.keyBytes = newKeyBytes;
-        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), getIV(), outputLength, keyBytes);
+        this.cachedIV = iv;
+        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), iv, outputLength, keyBytes);
         macState = new MACState(nativeHandle);
         macState.setKeyBytes(keyBytes);
         cleanable = cleaner.register(this, macState);
@@ -111,12 +129,15 @@ public abstract class OpenSSLMAC extends MacSpi {
 
     @Override
     protected void engineReset() {
+        if (keyBytes == null) {
+            throw new IllegalStateException("MAC not initialized");
+        }
         if (cleanable != null) {
             // Suppress keyBytes zeroing: we still need them for the doInit0 call below
             macState.setKeyBytes(null);
             cleanable.clean();
         }
-        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), getIV(), this.outputLength, keyBytes);
+        nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), this.cachedIV, this.outputLength, keyBytes);
         macState = new MACState(nativeHandle);
         macState.setKeyBytes(keyBytes);
         cleanable = cleaner.register(this, macState);
@@ -134,10 +155,19 @@ public abstract class OpenSSLMAC extends MacSpi {
 
     @Override
     protected void engineUpdate(ByteBuffer buffer) {
-        engineUpdate(buffer.array());
+        int remaining = buffer.remaining();
+        if (remaining <= 0) {
+            return;
+        }
+        byte[] chunk = new byte[remaining];
+        buffer.get(chunk);
+        engineUpdate(chunk);
     }
 
     private void engineUpdate(byte[] input) {
+        if (nativeHandle == 0) {
+            throw new IllegalStateException("MAC not initialized");
+        }
         doUpdate0(input);
     }
 

@@ -33,7 +33,7 @@ import java.security.DrbgParameters;
 
 public class OpenSSLDrbg extends SecureRandomSpi {
 
-    public static int DEFAULT_STRENGTH = 128;
+    public static final int DEFAULT_STRENGTH = 128;
     static {
         NativeLibraryLoader.load();
     }
@@ -66,6 +66,9 @@ public class OpenSSLDrbg extends SecureRandomSpi {
 
     protected OpenSSLDrbg(String name) {
         drbgContext = init(name, DEFAULT_STRENGTH, false, false, null);
+        if (drbgContext == 0) {
+            throw new ProviderException("Failed to initialize DRBG: " + name);
+        }
         cleanable = cleaner.register(this, new NativeDRBG(drbgContext));
     }
 
@@ -76,11 +79,14 @@ public class OpenSSLDrbg extends SecureRandomSpi {
 
         if (params != null) {
             this.params = params;
-            DrbgParameters.Instantiation ins = (DrbgParameters.Instantiation)params; 
+            DrbgParameters.Instantiation ins = (DrbgParameters.Instantiation)params;
             this.drbgContext = init(name, ins.getStrength(), ins.getCapability().supportsPredictionResistance(),
                                  ins.getCapability().supportsReseeding(), ins.getPersonalizationString());
         } else {
             this.drbgContext = init(name, DEFAULT_STRENGTH, false, false, null);
+        }
+        if (drbgContext == 0) {
+            throw new ProviderException("Failed to initialize DRBG: " + name);
         }
         cleanable = cleaner.register(this, new NativeDRBG(drbgContext));
     }
@@ -165,8 +171,15 @@ public class OpenSSLDrbg extends SecureRandomSpi {
     }
 
     protected void engineSetSeed(byte[] seed) {
+        if (!isInitialized()) {
+            throw new ProviderException("DRBG not initialized");
+        }
         synchronized (LOCK) {
-            reseed0(seed, false, null);
+            // FIPS DRBGs (SP 800-90A) require entropy_input from a validated
+            // entropy source; caller-supplied bytes are routed as additional_input
+            // so OpenSSL still pulls fresh entropy from the FIPS-approved source.
+            // This matches SecureRandom.setSeed's "supplements, not replaces" contract.
+            reseed0(null, false, seed);
         }
     }
 
