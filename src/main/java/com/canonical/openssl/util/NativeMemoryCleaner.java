@@ -23,5 +23,5 @@ public class NativeMemoryCleaner {
      * up by this cleaner. We do not want to have multiple Cleaners since
      * every cleaner spawns its own daemon thread.
      */
-    public static Cleaner cleaner = Cleaner.create();
+    public static final Cleaner cleaner = Cleaner.create();
 }

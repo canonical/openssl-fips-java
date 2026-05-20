@@ -16,6 +16,8 @@
  */
 package com.canonical.openssl.mac;
 
+import java.security.spec.AlgorithmParameterSpec;
+
 public final class HMACwithSHA3_512 extends OpenSSLMAC {
     protected String getAlgorithm() {
         return "HMAC";
@@ -29,8 +31,12 @@ public final class HMACwithSHA3_512 extends OpenSSLMAC {
         return "SHA3-512";
     }
 
-    protected byte[] getIV() {
+    protected byte[] getIV(AlgorithmParameterSpec spec) {
         return null;
+    }
+
+    protected int getDefaultMacLength() {
+        return 64;
     }
 }
 

@@ -23,6 +23,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 import java.security.*;
+import java.security.spec.ECGenParameterSpec;
 
 /**
  * Test FIPS-safe key conversion from Java Key objects to OpenSSL EVP_PKEY handles.
@@ -124,6 +125,40 @@ public class KeyConverterTest {
     public void testFreeEVPKeyWithZeroHandle() {
         // Should not crash
         KeyConverter.freeEVPKey(0);
+    }
+
+    @Test
+    public void testECKeyPairFromFIPSProviderConverts() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC", "OpenSSLFIPSProvider");
+        for (String curve : new String[]{"P-256", "P-384", "P-521"}) {
+            kpg.initialize(new ECGenParameterSpec(curve));
+            KeyPair kp = kpg.generateKeyPair();
+
+            long privHandle = KeyConverter.privateKeyToEVPKey(kp.getPrivate());
+            assertTrue("EC private key handle must be non-zero for " + curve, privHandle != 0);
+
+            long pubHandle = KeyConverter.publicKeyToEVPKey(kp.getPublic());
+            assertTrue("EC public key handle must be non-zero for " + curve, pubHandle != 0);
+
+            KeyConverter.freeEVPKey(privHandle);
+            KeyConverter.freeEVPKey(pubHandle);
+        }
+    }
+
+    @Test
+    public void testDHKeyPairFromFIPSProviderConverts() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("DH", "OpenSSLFIPSProvider");
+        kpg.initialize(2048);
+        KeyPair kp = kpg.generateKeyPair();
+
+        long privHandle = KeyConverter.privateKeyToEVPKey(kp.getPrivate());
+        assertTrue("DH private key handle must be non-zero", privHandle != 0);
+
+        long pubHandle = KeyConverter.publicKeyToEVPKey(kp.getPublic());
+        assertTrue("DH public key handle must be non-zero", pubHandle != 0);
+
+        KeyConverter.freeEVPKey(privHandle);
+        KeyConverter.freeEVPKey(pubHandle);
     }
 }
 

@@ -110,7 +110,13 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
 
     @Override
     protected void engineUpdate(ByteBuffer data) {
-        engineUpdate(data.array());
+        int remaining = data.remaining();
+        if (remaining <= 0) {
+            return;
+        }
+        byte[] chunk = new byte[remaining];
+        data.get(chunk);
+        engineUpdate(chunk);
     }
 
     private void engineUpdate(byte[] data) {

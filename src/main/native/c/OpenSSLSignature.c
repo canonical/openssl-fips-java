@@ -21,8 +21,6 @@
 #include "jni_utils.h"
 #include <openssl/crypto.h>
 
-extern OSSL_LIB_CTX *global_libctx;
-
 sv_params *create_params(JNIEnv *env, jobject this, jobject params, int *oom) {
    int salt_length = get_int_field(env, params, "saltLength");
    jstring digest = get_string_field(env, params, "digest");
@@ -30,9 +28,9 @@ sv_params *create_params(JNIEnv *env, jobject this, jobject params, int *oom) {
    jstring mgf1_digest = get_string_field(env, params, "mgf1Digest");
    char *mgf1_digest_name = jstring_to_char_array(env, mgf1_digest);
    int padding = get_int_field(env, params, "padding");
-   sv_params *svp = sv_create_params(global_libctx, salt_length, padding == 0 ? NONE : PSS, digest_name, mgf1_digest_name, oom);
-   (*env)->ReleaseStringUTFChars(env, digest, digest_name);
-   (*env)->ReleaseStringUTFChars(env, mgf1_digest, mgf1_digest_name);
+   sv_params *svp = sv_create_params(jssl_libctx(), salt_length, padding == 0 ? NONE : PSS, digest_name, mgf1_digest_name, oom);
+   release_jstring(env, digest, digest_name);
+   release_jstring(env, mgf1_digest, mgf1_digest_name);
    return svp;
 }
 
@@ -45,37 +43,52 @@ sv_type svtype_from_str(char *str) {
 
 jlong init_signature(JNIEnv *env, jobject this, jstring sig_name, jobject jkey, jobject params, sv_state state) {
     int oom = 0;
-    sv_params *svparams = create_params(env, this, params, &oom);
+    sv_params *svparams = NULL;
+    sv_key *key = NULL;
+    sv_context *svc = NULL;
+    char *sig_name_str = NULL;
+    jlong ret = 0;
+
+    svparams = create_params(env, this, params, &oom);
     if (svparams == NULL) {
         if (oom) throwOOM(env, "Out of memory creating signature params");
         else throwProviderException(env, "Failed to create signature params");
-        return 0;
+        goto cleanup;
     }
 
     EVP_PKEY* evpkey = CASTPTR(EVP_PKEY, invokeLongMethod(env, jkey, "getNativeKeyHandle", "()J"));
+    if ((*env)->ExceptionCheck(env)) {
+        goto cleanup;
+    }
     oom = 0;
-    sv_key *key = sv_init_key(global_libctx, evpkey, &oom);
+    key = sv_init_key(jssl_libctx(), evpkey, &oom);
     if (key == NULL) {
-        free_sv_params(&svparams);
         if (oom) throwOOM(env, "Out of memory initializing signature key");
         else throwProviderException(env, "Failed to initialize signature key");
-        return 0;
+        goto cleanup;
     }
 
-    char *sig_name_str = jstring_to_char_array(env, sig_name);
+    sig_name_str = jstring_to_char_array(env, sig_name);
+    if (sig_name_str == NULL) {
+        goto cleanup;
+    }
     sv_type type = svtype_from_str(sig_name_str);
-    (*env)->ReleaseStringUTFChars(env, sig_name, sig_name_str);
 
     oom = 0;
-    sv_context *svc = sv_init(global_libctx, key, svparams, state, type, &oom);
-    free_sv_params(&svparams);
+    svc = sv_init(jssl_libctx(), key, svparams, state, type, &oom);
     if (svc == NULL) {
-        free_sv_key(&key);
         if (oom) throwOOM(env, "Out of memory initializing signature context");
         else throwProviderException(env, "Failed to initialize signature context");
-        return 0;
+        goto cleanup;
     }
-    return (jlong)svc;
+    ret = (jlong)svc;
+    key = NULL;
+
+cleanup:
+    release_jstring(env, sig_name, sig_name_str);
+    if (svparams) free_sv_params(&svparams);
+    if (key) free_sv_key(&key);
+    return ret;
 }
 
 /*
@@ -106,6 +119,10 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_signature_OpenSSLSignature_en
  */
 JNIEXPORT void JNICALL Java_com_canonical_openssl_signature_OpenSSLSignature_engineUpdate0
   (JNIEnv *env, jobject this, jbyteArray bytes, jint offset, jint length) {
+    if (offset < 0 || length < 0) {
+        throwIllegalArgument(env, "offset and length must be non-negative");
+        return;
+    }
     sv_context *ctx = (sv_context*)get_long_field(env, this, "nativeHandle");
     byte *to_update = (byte*)malloc(length);
     if (to_update == NULL) {
@@ -116,6 +133,7 @@ JNIEXPORT void JNICALL Java_com_canonical_openssl_signature_OpenSSLSignature_eng
     if (sv_update(ctx, to_update, length) <= 0) {
         throwProviderException(env, "Signature update failed");
     }
+    OPENSSL_cleanse(to_update, length);
     free(to_update);
 }
 
@@ -129,7 +147,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_signature_OpenSSLSignatu
     sv_context *ctx = (sv_context*)get_long_field(env, this, "nativeHandle");
     size_t sig_length = 0;
     if (sv_sign(ctx, NULL, &sig_length) < 0) {
-        free_sv_context(&ctx);
+        throwProviderException(env, "Signing failed");
         return NULL;
     }
 
@@ -158,6 +176,10 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_signature_OpenSSLSignatu
  */
 JNIEXPORT jboolean JNICALL Java_com_canonical_openssl_signature_OpenSSLSignature_engineVerify0
   (JNIEnv *env, jobject this, jbyteArray sig_bytes, jint offset, jint length) {
+    if (offset < 0 || length < 0) {
+        throwIllegalArgument(env, "offset and length must be non-negative");
+        return JNI_FALSE;
+    }
     sv_context *ctx = (sv_context*)get_long_field(env, this, "nativeHandle");
     byte *signature = (byte*)malloc(length);
     if (signature == NULL) {
@@ -167,7 +189,13 @@ JNIEXPORT jboolean JNICALL Java_com_canonical_openssl_signature_OpenSSLSignature
     copy_byte_array_range(env, sig_bytes, offset, length, signature);
     int rc = sv_verify(ctx, signature, length);
     free(signature);
-    return rc <= 0 ? JNI_FALSE : JNI_TRUE;
+    if (rc < 0) {
+        (*env)->ThrowNew(env,
+            (*env)->FindClass(env, "java/security/SignatureException"),
+            "Signature verification error");
+        return JNI_FALSE;
+    }
+    return rc == 1 ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL Java_com_canonical_openssl_signature_OpenSSLSignature_cleanupNativeMemory0

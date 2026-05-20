@@ -15,7 +15,6 @@
  *
  */
 #include "md.h"
-#include <openssl/err.h>
 
 md_context *md_init(OSSL_LIB_CTX *libctx, const char *algorithm, int *oom) {
     md_context *new = NULL;
@@ -57,17 +56,17 @@ error:
 
 jssl_status md_update(md_context *ctx, byte *input, size_t input_length) {
     if (!EVP_DigestUpdate(ctx->ossl_ctx, input, input_length)) {
-        ERR_print_errors_fp(stderr);
         return FAIL_EVP;
     }
     return SUCCESS;
 }
 
 jssl_status md_digest(md_context *ctx, byte *output, int *output_length) {
-    if (!EVP_DigestFinal_ex(ctx->ossl_ctx, output, output_length)) {
-        ERR_print_errors_fp(stderr);
+    unsigned int len = 0;
+    if (!EVP_DigestFinal_ex(ctx->ossl_ctx, output, &len)) {
         return FAIL_EVP;
     }
+    *output_length = (int)len;
     return SUCCESS;
 }
 

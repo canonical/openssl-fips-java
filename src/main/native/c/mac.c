@@ -17,7 +17,6 @@
 #include "jssl.h"
 #include "mac.h"
 #include <openssl/evp.h>
-#include <openssl/err.h>
 #include <openssl/core_names.h>
 
 mac_params *init_mac_params(char *cipher, char *digest, byte *iv, size_t iv_length, size_t output_length) {
@@ -31,7 +30,7 @@ mac_params *init_mac_params(char *cipher, char *digest, byte *iv, size_t iv_leng
     return new;
 }
 
-static void set_params(EVP_MAC_CTX *ctx, mac_params *params) {
+static int set_params(EVP_MAC_CTX *ctx, mac_params *params) {
     OSSL_PARAM _params[8];
     int n_params = 0;
     if (params->cipher_name != NULL) {
@@ -44,21 +43,18 @@ static void set_params(EVP_MAC_CTX *ctx, mac_params *params) {
         _params[n_params++] = OSSL_PARAM_construct_octet_string("iv", params->iv, params->iv_length);
     }
     _params[n_params] = OSSL_PARAM_construct_end();
-    if (0 == EVP_MAC_CTX_set_params(ctx, _params)) {
-        ERR_print_errors_fp(stderr);
-    }
+    return EVP_MAC_CTX_set_params(ctx, _params);
 }
 
-mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params *params, int *oom) {
+mac_context *mac_init(OSSL_LIB_CTX *libctx, char *algorithm, byte *key, size_t key_length, mac_params *params, int *oom) {
     mac_context *new_ctx = (mac_context *)malloc(sizeof(mac_context));
     if (new_ctx == NULL) {
         if (oom) *oom = 1;
         return NULL;
     }
-    new_ctx->algorithm = algorithm;
     new_ctx->ctx = NULL;
 
-    EVP_MAC *mac = EVP_MAC_fetch(NULL, algorithm, NULL);
+    EVP_MAC *mac = EVP_MAC_fetch(libctx, algorithm, "provider=fips");
     if (mac == NULL) {
         goto error;
     }
@@ -67,8 +63,8 @@ mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params 
     if (new_ctx->ctx == NULL) {
         goto error;
     }
-    if (params != NULL) {
-        set_params(new_ctx->ctx, params);
+    if (params != NULL && set_params(new_ctx->ctx, params) == 0) {
+        goto error;
     }
     if (0 == EVP_MAC_init(new_ctx->ctx, (const unsigned char*)key, key_length, NULL)) {
         goto error;
@@ -76,14 +72,12 @@ mac_context *mac_init(char *algorithm, byte *key, size_t key_length, mac_params 
     return new_ctx;
 
 error:
-    ERR_print_errors_fp(stderr);
     free_mac_context(&new_ctx);
     return NULL;
 }
 
 jssl_status mac_update(mac_context *ctx, byte *input, size_t input_size) {
     if (0 == EVP_MAC_update(ctx->ctx, input, input_size)) {
-        ERR_print_errors_fp(stderr);
         return FAIL_EVP;
     }
     return SUCCESS;
@@ -91,7 +85,6 @@ jssl_status mac_update(mac_context *ctx, byte *input, size_t input_size) {
 
 jssl_status mac_final(mac_context *ctx, byte *output, size_t *bytes_written, size_t output_size) {
     if (0 == EVP_MAC_final(ctx->ctx, output, bytes_written, output_size)) {
-        ERR_print_errors_fp(stderr);
         return FAIL_EVP;
     }
     return SUCCESS;

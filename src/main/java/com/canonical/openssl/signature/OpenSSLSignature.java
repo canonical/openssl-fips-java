@@ -24,8 +24,14 @@ import java.lang.ref.Cleaner;
 import java.util.concurrent.atomic.AtomicLong;
 import java.nio.ByteBuffer;
 import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.PSSParameterSpec;
 import java.security.AlgorithmParameters;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidParameterSpecException;
+import java.security.InvalidParameterException;
 import java.security.PrivateKey;
 import java.security.ProviderException;
 import java.security.PublicKey;
@@ -108,8 +114,7 @@ public abstract class OpenSSLSignature extends SignatureSpi {
 
     @Override
     protected Object engineGetParameter(String param) {
-        // TODO
-        throw new UnsupportedOperationException();
+        throw new InvalidParameterException("Legacy getParameter(String) is not supported; use getParameters()");
     }
 
     @Override
@@ -124,6 +129,9 @@ public abstract class OpenSSLSignature extends SignatureSpi {
 
     @Override
     protected void engineInitSign(PrivateKey key) throws InvalidKeyException {
+       if (key == null) {
+           throw new InvalidKeyException("Key must not be null");
+       }
        if (key instanceof OpenSSLPrivateKey privKey) {
            if (cleanable != null) {
                cleanable.clean();
@@ -143,6 +151,9 @@ public abstract class OpenSSLSignature extends SignatureSpi {
 
     @Override
     protected void engineInitVerify(PublicKey key) throws InvalidKeyException {
+        if (key == null) {
+            throw new InvalidKeyException("Key must not be null");
+        }
         if (key instanceof OpenSSLPublicKey pubKey) {
             if (cleanable != null) {
                 cleanable.clean();
@@ -156,18 +167,49 @@ public abstract class OpenSSLSignature extends SignatureSpi {
 
     @Override
     protected AlgorithmParameters engineGetParameters() {
-        // TODO
-        throw new UnsupportedOperationException();
+        if (params == null || params.padding != Params.PSS_PADDING) {
+            return null;
+        }
+        String mgf1Digest = (params.mgf1Digest != null) ? params.mgf1Digest : params.digest;
+        if (mgf1Digest == null) {
+            throw new ProviderException("PSS padding is set but no digest has been configured");
+        }
+        try {
+            AlgorithmParameters ap = AlgorithmParameters.getInstance("RSASSA-PSS");
+            ap.init(new PSSParameterSpec(params.digest, "MGF1", new MGF1ParameterSpec(mgf1Digest), params.saltLength, 1));
+            return ap;
+        } catch (NoSuchAlgorithmException | InvalidParameterSpecException e) {
+            throw new ProviderException("Could not encode PSS AlgorithmParameters", e);
+        }
     }
 
     @Override
-    protected void engineSetParameter(AlgorithmParameterSpec params) {
-        // TODO
-        throw new UnsupportedOperationException();
+    protected void engineSetParameter(AlgorithmParameterSpec params) throws InvalidAlgorithmParameterException {
+        if (params == null) {
+            throw new InvalidAlgorithmParameterException("AlgorithmParameterSpec must not be null");
+        }
+        if (!(params instanceof PSSParameterSpec pss)) {
+            throw new InvalidAlgorithmParameterException("Only PSSParameterSpec is supported, got: " + params.getClass().getName());
+        }
+        if (!"MGF1".equalsIgnoreCase(pss.getMGFAlgorithm())) {
+            throw new InvalidAlgorithmParameterException("Only MGF1 is supported for PSS MGF, got: " + pss.getMGFAlgorithm());
+        }
+        if (pss.getTrailerField() != 1) {
+            throw new InvalidAlgorithmParameterException("Only PSS trailerField=1 is supported, got: " + pss.getTrailerField());
+        }
+        AlgorithmParameterSpec mgfSpec = pss.getMGFParameters();
+        if (mgfSpec != null && !(mgfSpec instanceof MGF1ParameterSpec)) {
+            throw new InvalidAlgorithmParameterException("Only MGF1 is supported for PSS MGF, got: " + mgfSpec.getClass().getName());
+        }
+        String mgf1Digest = (mgfSpec != null) ? ((MGF1ParameterSpec) mgfSpec).getDigestAlgorithm() : null;
+        this.params = new Params(pss.getDigestAlgorithm(), pss.getSaltLength(), Padding.PSS, mgf1Digest);
     }
 
     @Override
     protected byte[] engineSign() {
+        if (nativeHandle == 0) {
+            throw new IllegalStateException("Signature not initialized");
+        }
         return engineSign0();
     }
 
@@ -188,6 +230,15 @@ public abstract class OpenSSLSignature extends SignatureSpi {
 
     @Override
     protected void engineUpdate(byte[] b, int off, int len) throws SignatureException {
+        if (nativeHandle == 0) {
+            throw new IllegalStateException("Signature not initialized");
+        }
+        if (b == null) {
+            throw new NullPointerException("input array must not be null");
+        }
+        if (off < 0 || len < 0 || off > b.length - len) {
+            throw new IllegalArgumentException("Invalid offset/length");
+        }
         engineUpdate0(b, off, len);
     }
 
@@ -217,6 +268,15 @@ public abstract class OpenSSLSignature extends SignatureSpi {
 
     @Override
     protected boolean engineVerify(byte[] sigBytes, int offset, int length) {
+        if (nativeHandle == 0) {
+            throw new IllegalStateException("Signature not initialized");
+        }
+        if (sigBytes == null) {
+            throw new NullPointerException("signature bytes must not be null");
+        }
+        if (offset < 0 || length < 0 || offset > sigBytes.length - length) {
+            throw new IllegalArgumentException("Invalid offset/length");
+        }
         return engineVerify0(sigBytes, offset, length);
     }
 

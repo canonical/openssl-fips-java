@@ -17,10 +17,18 @@
 package com.canonical.openssl.keyagreement;
 
 import java.security.Key;
+import java.util.Arrays;
 
 public final class ECDHKeyAgreement extends OpenSSLKeyAgreement {
     protected long initialize(Key key) {
-        return engineInit0(OpenSSLKeyAgreement.AGREEMENT_ECDH, key.getEncoded());
+        byte[] encoded = key.getEncoded();
+        try {
+            return engineInit0(OpenSSLKeyAgreement.AGREEMENT_ECDH, encoded);
+        } finally {
+            if (encoded != null) {
+                Arrays.fill(encoded, (byte) 0);
+            }
+        }
     }
 
     @Override

@@ -53,7 +53,8 @@ typedef struct sv_context {
     sv_type type;
     sv_key *key;
     byte *data;
-    int length;
+    size_t length;
+    size_t capacity;
     EVP_MD_CTX *mctx;
 } sv_context;
 

@@ -87,7 +87,7 @@ void run_test(mac_context *ctx) {
 void test_cmac(OSSL_LIB_CTX *libctx) {
     printf("Testing CMAC: ");
     mac_params *params = init_mac_params("AES-256-CBC", NULL, NULL, 0, 0);
-    mac_context *ctx = mac_init("CMAC", key, 32, params, NULL);
+    mac_context *ctx = mac_init(libctx, "CMAC", key, 32, params, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
     free(params);
@@ -95,8 +95,8 @@ void test_cmac(OSSL_LIB_CTX *libctx) {
 
 void test_hmac_sha1(OSSL_LIB_CTX *libctx) {
     printf("Testing HMAC with SHA-1: ");
-    mac_params *params = init_mac_params(NULL, "SHA1", NULL, 0, 0); 
-    mac_context *ctx = mac_init("HMAC", key, 64, params, NULL);
+    mac_params *params = init_mac_params(NULL, "SHA1", NULL, 0, 0);
+    mac_context *ctx = mac_init(libctx, "HMAC", key, 64, params, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
     free(params);
@@ -105,7 +105,7 @@ void test_hmac_sha1(OSSL_LIB_CTX *libctx) {
 void test_hmac_sha3(OSSL_LIB_CTX *libctx) {
     printf("Testing HMAC with SHA3-512: ");
     mac_params *params = init_mac_params(NULL, "SHA3-512", NULL, 0, 0);
-    mac_context *ctx = mac_init("HMAC", key, 64, params, NULL);
+    mac_context *ctx = mac_init(libctx, "HMAC", key, 64, params, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
     free(params);
@@ -114,22 +114,22 @@ void test_hmac_sha3(OSSL_LIB_CTX *libctx) {
 void test_gmac(OSSL_LIB_CTX *libctx) {
     printf("Testing GMAC: ");
     mac_params *params = init_mac_params("AES-128-GCM", NULL, iv, sizeof(iv), 0);
-    mac_context *ctx = mac_init("GMAC", key, 16, params, NULL);
-    run_test(ctx); 
+    mac_context *ctx = mac_init(libctx, "GMAC", key, 16, params, NULL);
+    run_test(ctx);
     free_mac_context(&ctx);
     free(params);
 }
 
 void test_kmac128(OSSL_LIB_CTX *libctx) {
     printf("Testing KMAC-128: ");
-    mac_context *ctx = mac_init("KMAC-128", key, 16, NULL, NULL);
+    mac_context *ctx = mac_init(libctx, "KMAC-128", key, 16, NULL, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
 }
 
 void test_kmac256(OSSL_LIB_CTX *libctx) {
     printf("Testing KMAC-256: ");
-    mac_context *ctx = mac_init("KMAC-256", key, 32, NULL, NULL);
+    mac_context *ctx = mac_init(libctx, "KMAC-256", key, 32, NULL, NULL);
     run_test(ctx);
     free_mac_context(&ctx);
 }

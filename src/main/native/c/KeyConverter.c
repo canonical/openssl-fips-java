@@ -20,8 +20,6 @@
 #include "evp_utils.h"
 #include "jni_utils.h"
 
-extern OSSL_LIB_CTX *global_libctx;
-
 /*
  * Class:     com_canonical_openssl_key_KeyConverter
  * Method:    privateKeyToEVPKey0
@@ -45,7 +43,7 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_key_KeyConverter_privateKeyTo
     }
 
     /* Use FIPS-safe decoder to convert DER to EVP_PKEY */
-    EVP_PKEY *pkey = decode_private_key_fips(bytes, (size_t)length, global_libctx);
+    EVP_PKEY *pkey = decode_private_key_fips(bytes, (size_t)length, jssl_libctx());
 
     (*env)->ReleaseByteArrayElements(env, encodedKey, (jbyte*)bytes, JNI_ABORT);
 
@@ -75,7 +73,7 @@ JNIEXPORT jlong JNICALL Java_com_canonical_openssl_key_KeyConverter_publicKeyToE
     }
 
     /* Use FIPS-safe decoder to convert DER to EVP_PKEY */
-    EVP_PKEY *pkey = decode_public_key_fips(bytes, (size_t)length, global_libctx);
+    EVP_PKEY *pkey = decode_public_key_fips(bytes, (size_t)length, jssl_libctx());
 
     (*env)->ReleaseByteArrayElements(env, encodedKey, (jbyte*)bytes, JNI_ABORT);
 

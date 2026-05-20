@@ -18,6 +18,7 @@ package com.canonical.openssl.key;
 import com.canonical.openssl.util.NativeLibraryLoader;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.util.Arrays;
 /**
  * Utility class for converting Java Key objects to OpenSSL EVP_PKEY handles.
  * 
@@ -58,7 +59,11 @@ public class KeyConverter {
         if (encoded == null) {
             throw new IllegalArgumentException("Key does not support encoding");
         }
-        return privateKeyToEVPKey0(encoded);
+        try {
+            return privateKeyToEVPKey0(encoded);
+        } finally {
+            Arrays.fill(encoded, (byte) 0);
+        }
     }
     /**
      * Convert a Java PublicKey to an OpenSSL EVP_PKEY handle.

@@ -52,13 +52,13 @@ public class KeyAgreementTest {
 
     @Test
     public void testDH() throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("DH");
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("DH", "OpenSSLFIPSProvider");
         runTest(kpg, "DH");
     }
 
     @Test
     public void testECDH() throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC", "OpenSSLFIPSProvider");
         runTest(kpg, "ECDH");
     }
 }

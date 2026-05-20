@@ -50,7 +50,7 @@ shared_secret *generate_shared_secret(key_agreement *agreement, int *evp_error) 
     }
 
     if (EVP_PKEY_derive_init(ctx) <= 0) {
-	if (evp_error) *evp_error = 1;
+        if (evp_error) *evp_error = 1;
         goto error;
     }
 
@@ -119,7 +119,9 @@ EVP_PKEY *generate_key(key_agreement_algorithm algo, OSSL_LIB_CTX *libctx) {
         goto error;
     }
 
-    EVP_PKEY_CTX_set_params(pctx, params);
+    if (EVP_PKEY_CTX_set_params(pctx, params) <= 0) {
+        goto error;
+    }
 
     if(EVP_PKEY_keygen(pctx, &key) <= 0) {
         goto error;

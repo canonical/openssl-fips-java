@@ -15,31 +15,49 @@
  *
  */
 #include <jni.h>
+#include <openssl/crypto.h>
+#include <openssl/x509.h>
 #include "jssl.h"
 #include "keyagreement.h"
 #include "OpenSSLKeyAgreement.h"
-#include "evp_utils.h"
 #include "jni_utils.h"
 
-extern OSSL_LIB_CTX *global_libctx;
-
+static int evp_type_for(key_agreement_algorithm algo) {
+    switch (algo) {
+        case DIFFIE_HELLMAN: return EVP_PKEY_DH;
+        case ELLIPTIC_CURVE: return EVP_PKEY_EC;
+        default:             return -1;
+    }
+}
 
 /*
  * Class:     OpenSSLKeyAgreementSpi
  * Method:    engineInit0
  * Signature: (I[B)J
  */
-JNIEXPORT long JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreement_engineInit0
+JNIEXPORT jlong JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreement_engineInit0
   (JNIEnv *env, jobject this, jint algo, jbyteArray keyBytes) {
     key_agreement_algorithm type = algo;
-    key_agreement *agreement = init_key_agreement(type, global_libctx);
+    key_agreement *agreement = init_key_agreement(type, jssl_libctx());
     if (agreement == NULL) return 0;
     jsize key_length = (*env)->GetArrayLength(env, keyBytes);
     jbyte *key_bytes = (*env)->GetByteArrayElements(env, keyBytes, NULL);
-    EVP_PKEY *private_key = decode_private_key_fips((byte *)key_bytes, key_length, global_libctx);
+    if (key_bytes == NULL) {
+        free_key_agreement(&agreement);
+        return 0;
+    }
+    const byte *p = (const byte *)key_bytes;
+    EVP_PKEY *private_key = d2i_PrivateKey_ex(evp_type_for(type), NULL,
+                                              &p, key_length,
+                                              jssl_libctx(), NULL);
     (*env)->ReleaseByteArrayElements(env, keyBytes, key_bytes, JNI_ABORT);
+    if (private_key == NULL) {
+        free_key_agreement(&agreement);
+        throwProviderException(env, "Failed to decode private key for key agreement");
+        return 0;
+    }
     set_private_key(agreement, private_key);
-    return (long)agreement;
+    return (jlong)agreement;
 }
 
 /*
@@ -52,8 +70,17 @@ JNIEXPORT void JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreeme
     key_agreement *agreement = (key_agreement *)get_long_field(env, this, "nativeHandle");
     jsize key_length = (*env)->GetArrayLength(env, keyBytes);
     jbyte *key_bytes = (*env)->GetByteArrayElements(env, keyBytes, NULL);
-    EVP_PKEY *public_key = decode_public_key_fips((byte *)key_bytes, key_length, global_libctx);
+    if (key_bytes == NULL) {
+        return;
+    }
+    const byte *p = (const byte *)key_bytes;
+    EVP_PKEY *public_key = d2i_PUBKEY_ex(NULL, &p, key_length,
+                                         jssl_libctx(), NULL);
     (*env)->ReleaseByteArrayElements(env, keyBytes, key_bytes, JNI_ABORT);
+    if (public_key == NULL) {
+        throwProviderException(env, "Failed to decode public key for key agreement");
+        return;
+    }
     set_peer_key(agreement, public_key);
 }
 
@@ -77,6 +104,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyA
         }
     }
     jbyteArray byteArray = byte_array_to_jbyteArray(env, secret->bytes, secret->length);
+    OPENSSL_cleanse(secret->bytes, secret->length);
     return byteArray;
 }
 
@@ -87,5 +115,6 @@ JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyA
  */
 JNIEXPORT void JNICALL Java_com_canonical_openssl_keyagreement_OpenSSLKeyAgreement_cleanupNativeMemory0
   (JNIEnv *env, jclass clazz, jlong handle) {
-    free_key_agreement((key_agreement**) &handle);
+    key_agreement *agreement = (key_agreement*)handle;
+    free_key_agreement(&agreement);
 }

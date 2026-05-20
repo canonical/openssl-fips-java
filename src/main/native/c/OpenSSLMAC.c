@@ -31,45 +31,84 @@
  */
 JNIEXPORT jlong JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doInit0
     (JNIEnv *env, jobject this, jstring name, jstring cipher, jstring digest, jbyteArray iv, jint output_length, jbyteArray key) {
-    const char *name_str   = jstring_to_char_array(env, name);
-    const char *cipher_str = jstring_to_char_array(env, cipher);
-    const char *digest_str = jstring_to_char_array(env, digest);
-    byte       *iv_bytes   = jbyteArray_to_byte_array(env, iv);
-    int         iv_len     = array_length(env, iv);
-    byte       *key_bytes  = jbyteArray_to_byte_array(env, key);
-    int         key_len    = array_length(env, key);
-
-    mac_params *params = init_mac_params((char *)cipher_str, (char *)digest_str,
-                                         iv_bytes, iv_len, (size_t)output_length);
+    const char *name_str    = NULL;
+    const char *cipher_str  = NULL;
+    const char *digest_str  = NULL;
+    jbyte      *iv_pinned   = NULL;
+    jbyte      *key_pinned  = NULL;
+    byte       *iv_copy     = NULL;
+    byte       *key_copy    = NULL;
+    int         iv_len      = 0;
+    int         key_len     = 0;
+    mac_params *params      = NULL;
+    mac_context *ctx        = NULL;
     int oom = 0;
-    mac_context *ctx = mac_init((char *)name_str, key_bytes, key_len, params, &oom);
-    free(params);
+    jlong ret = 0;
 
-    if (key_bytes) {
-        OPENSSL_cleanse(key_bytes, key_len);
-        (*env)->ReleaseByteArrayElements(env, key, (jbyte *)key_bytes, JNI_ABORT);
+    name_str = jstring_to_char_array(env, name);
+    if (name != NULL && name_str == NULL) goto cleanup;
+    cipher_str = jstring_to_char_array(env, cipher);
+    if (cipher != NULL && cipher_str == NULL) goto cleanup;
+    digest_str = jstring_to_char_array(env, digest);
+    if (digest != NULL && digest_str == NULL) goto cleanup;
+
+    if (iv != NULL) {
+        iv_len = (*env)->GetArrayLength(env, iv);
+        iv_pinned = (*env)->GetByteArrayElements(env, iv, NULL);
+        if (iv_pinned == NULL) goto cleanup;
+        iv_copy = (byte *)malloc(iv_len);
+        if (iv_copy == NULL) {
+            throwOOM(env, "Could not allocate IV buffer");
+            goto cleanup;
+        }
+        memcpy(iv_copy, iv_pinned, iv_len);
     }
-    if (iv_bytes) {
-        OPENSSL_cleanse(iv_bytes,  iv_len);
-        (*env)->ReleaseByteArrayElements(env, iv,  (jbyte *)iv_bytes,  JNI_ABORT);
+
+    if (key != NULL) {
+        key_len = (*env)->GetArrayLength(env, key);
+        key_pinned = (*env)->GetByteArrayElements(env, key, NULL);
+        if (key_pinned == NULL) goto cleanup;
+        key_copy = (byte *)malloc(key_len);
+        if (key_copy == NULL) {
+            throwOOM(env, "Could not allocate key buffer");
+            goto cleanup;
+        }
+        memcpy(key_copy, key_pinned, key_len);
     }
-    if (name_str)
-        (*env)->ReleaseStringUTFChars(env, name,   name_str);
 
-    if (cipher_str)
-        (*env)->ReleaseStringUTFChars(env, cipher, cipher_str);
-
-    if (digest_str)
-        (*env)->ReleaseStringUTFChars(env, digest, digest_str);
+    params = init_mac_params((char *)cipher_str, (char *)digest_str,
+                             iv_copy, iv_len, (size_t)output_length);
+    ctx = mac_init(jssl_libctx(), (char *)name_str, key_copy, key_len, params, &oom);
 
     if (ctx == NULL) {
         if (oom)
             throwOOM(env, "Out of memory initializing MAC");
         else
             throwProviderException(env, "Failed to initialize MAC");
-        return 0;
+        goto cleanup;
     }
-    return (jlong)ctx;
+    ret = (jlong)ctx;
+
+cleanup:
+    free(params);
+    if (key_pinned) {
+        (*env)->ReleaseByteArrayElements(env, key, key_pinned, JNI_ABORT);
+    }
+    if (iv_pinned) {
+        (*env)->ReleaseByteArrayElements(env, iv, iv_pinned, JNI_ABORT);
+    }
+    if (key_copy) {
+        OPENSSL_cleanse(key_copy, key_len);
+        free(key_copy);
+    }
+    if (iv_copy) {
+        OPENSSL_cleanse(iv_copy, iv_len);
+        free(iv_copy);
+    }
+    release_jstring(env, name,   name_str);
+    release_jstring(env, cipher, cipher_str);
+    release_jstring(env, digest, digest_str);
+    return ret;
 }
 
 /*
@@ -92,9 +131,12 @@ JNIEXPORT void JNICALL Java_com_canonical_openssl_mac_OpenSSLMAC_doUpdate0
     (JNIEnv *env, jobject this, jbyteArray input) {
     mac_context *ctx = (mac_context*)get_long_field(env, this, "nativeHandle");
     byte *input_bytes = jbyteArray_to_byte_array(env, input);
+    if (input_bytes == NULL) {
+        return;
+    }
     int input_len = array_length(env, input);
     jssl_status rc = mac_update(ctx, input_bytes, input_len);
-    (*env)->ReleaseByteArrayElements(env, input, (jbyte *)input_bytes, JNI_ABORT);
+    release_jbyteArray(env, input, input_bytes);
     if (rc != SUCCESS) {
         throwProviderException(env, "MAC update failed");
     }
