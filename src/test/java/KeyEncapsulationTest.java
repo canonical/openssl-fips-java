@@ -61,4 +61,37 @@ public class KeyEncapsulationTest {
 
         assertTrue("Key Encapsulation with RSA test failed", aliceSecret.equals(bobSecret));
     }
+
+    @Test
+    public void testKEMRSAPartialRange() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(4096);
+
+        KeyPair aliceKeys = kpg.generateKeyPair();
+        PublicKey alicePublicKey = aliceKeys.getPublic();
+        PrivateKey alicePrivateKey = aliceKeys.getPrivate();
+
+        // Bob encapsulates only a sub-range of the shared secret
+        KEM bobKem = KEM.getInstance("RSA", "OpenSSLFIPSProvider");
+        Encapsulator encapsulator = bobKem.newEncapsulator(alicePublicKey, null, null);
+        int secretSize = encapsulator.secretSize();
+        int from = 8;
+        int to = secretSize / 2;
+        KEM.Encapsulated encapsulated = encapsulator.encapsulate(from, to, "AES");
+        SecretKey bobSecret = encapsulated.key();
+
+        // The key must only contain the requested slice of the secret
+        assertTrue("Encapsulated key has wrong length for partial range",
+                bobSecret.getEncoded().length == to - from);
+
+        // Alice decapsulates the same sub-range and must recover the same key
+        KEM aliceKem = KEM.getInstance("RSA", "OpenSSLFIPSProvider");
+        Decapsulator decapsulator = aliceKem.newDecapsulator(alicePrivateKey, null);
+        byte[] encapsulationBytes = encapsulated.encapsulation();
+        SecretKey aliceSecret = decapsulator.decapsulate(encapsulationBytes, from, to, "AES");
+
+        assertTrue("Decapsulated key has wrong length for partial range",
+                aliceSecret.getEncoded().length == to - from);
+        assertTrue("Partial range KEM with RSA test failed", aliceSecret.equals(bobSecret));
+    }
 }
