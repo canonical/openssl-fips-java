@@ -26,10 +26,10 @@ extern "C" {
 /*
  * Class:     com_canonical_openssl_kdf_OpenSSLPBKDF2
  * Method:    generateSecret0
- * Signature: ([C[BII)[B
+ * Signature: ([B[BII)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_com_canonical_openssl_kdf_OpenSSLPBKDF2_generateSecret0
-  (JNIEnv *, jobject, jcharArray, jbyteArray, jint, jint);
+  (JNIEnv *, jobject, jbyteArray, jbyteArray, jint, jint);
 
 JNIEXPORT jint JNICALL Java_com_canonical_openssl_kdf_OpenSSLPBKDF2_getMaxKeyLengthBytes0
   (JNIEnv *, jclass);
