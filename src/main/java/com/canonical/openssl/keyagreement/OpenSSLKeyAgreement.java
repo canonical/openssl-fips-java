@@ -129,6 +129,9 @@ abstract public class OpenSSLKeyAgreement extends KeyAgreementSpi {
             cleanable.clean();
         }
         nativeHandle = initialize(key);
+        if (nativeHandle == 0) {
+            throw new InvalidKeyException("Failed to initialize key agreement");
+        }
         cleanable = cleaner.register(this, new KeyAgreementState(nativeHandle));
         state = State.INITIALIZED;
     }

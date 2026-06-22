@@ -97,10 +97,10 @@ final public class OpenSSLKEMRSA implements KEMSpi {
                 throw new InvalidKeyException("Key does not support encoding");
             }
             nativeHandle = encapsulatorInit0(encoded);
-            cleanable = cleaner.register(this, new EncapsulatorState(nativeHandle));
             if (nativeHandle == 0) {
                 throw new InvalidKeyException("Failed to initialize RSA-KEM encapsulator");
             }
+            cleanable = cleaner.register(this, new EncapsulatorState(nativeHandle));
         }
 
         public KEM.Encapsulated engineEncapsulate(int from, int to, String algorithm) {
@@ -173,10 +173,10 @@ final public class OpenSSLKEMRSA implements KEMSpi {
             } finally {
                 Arrays.fill(encoded, (byte) 0);
             }
-            cleanable = cleaner.register(this, new DecapsulatorState(nativeHandle));
             if (nativeHandle == 0) {
                 throw new InvalidKeyException("Failed to initialize RSA-KEM decapsulator");
             }
+            cleanable = cleaner.register(this, new DecapsulatorState(nativeHandle));
         }
 
         public SecretKey engineDecapsulate(byte[] encapsulation, int from, int to, String algorithm)
