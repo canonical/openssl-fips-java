@@ -22,6 +22,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
 import javax.crypto.spec.IvParameterSpec;
 import java.security.spec.AlgorithmParameterSpec;
+import java.security.InvalidAlgorithmParameterException;
 import com.canonical.openssl.provider.OpenSSLFIPSProvider;
 
 import org.junit.Test;
@@ -441,6 +442,53 @@ public class CipherTest {
         byte[] result = dec.doFinal(ciphertext, 2 * chunk, ciphertext.length - 2 * chunk);
 
         assertArrayEquals("AEAD multi-update decrypt failed for " + cipherName, plaintext, result);
+    }
+
+    @Test
+    public void testGCMNonceReuseRejected() throws Exception {
+        for (String cipher : new String[]{"AES128/GCM", "AES192/GCM", "AES256/GCM"}) {
+            runTestGCMNonceReuseRejected(cipher);
+        }
+    }
+
+    private void runTestGCMNonceReuseRejected(String nameKeySizeAndMode) throws Exception {
+        String cipherName = nameKeySizeAndMode + "/NONE";
+        SecureRandom sr = SecureRandom.getInstance("NativePRNG");
+
+        int keyBytes = nameKeySizeAndMode.contains("256") ? 32
+                     : nameKeySizeAndMode.contains("192") ? 24 : 16;
+        byte[] key = new byte[keyBytes];
+        sr.nextBytes(key);
+        SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+
+        byte[] iv = new byte[12];
+        sr.nextBytes(iv);
+        GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
+
+        byte[] plaintext = new byte[32];
+        sr.nextBytes(plaintext);
+
+        Cipher enc = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+        enc.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec, sr);
+        enc.doFinal(plaintext);
+
+        // Re-initializing the same instance for encryption with the same key+IV must be rejected.
+        try {
+            enc.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec, sr);
+            fail("GCM nonce reuse for encryption must be rejected for " + cipherName);
+        } catch (InvalidAlgorithmParameterException expected) {
+            // expected
+        }
+
+        // A fresh IV under the same key must be accepted.
+        byte[] iv2 = new byte[12];
+        sr.nextBytes(iv2);
+        enc.init(Cipher.ENCRYPT_MODE, keySpec, new GCMParameterSpec(128, iv2), sr);
+
+        // Decryption must never be blocked from reusing an IV.
+        Cipher dec = Cipher.getInstance(cipherName, "OpenSSLFIPSProvider");
+        dec.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec, sr);
+        dec.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec, sr);
     }
 
     @Test
