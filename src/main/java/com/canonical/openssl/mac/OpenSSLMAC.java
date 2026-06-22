@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.ProviderException;
 import java.util.Arrays;
 import javax.crypto.MacSpi;
 import java.security.InvalidAlgorithmParameterException;
@@ -122,6 +123,11 @@ public abstract class OpenSSLMAC extends MacSpi {
         this.keyBytes = newKeyBytes;
         this.cachedIV = iv;
         nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), iv, outputLength, keyBytes);
+        if (nativeHandle == 0) {
+            Arrays.fill(keyBytes, (byte) 0);
+            this.keyBytes = null;
+            throw new InvalidKeyException("Failed to initialize MAC");
+        }
         macState = new MACState(nativeHandle);
         macState.setKeyBytes(keyBytes);
         cleanable = cleaner.register(this, macState);
@@ -138,6 +144,9 @@ public abstract class OpenSSLMAC extends MacSpi {
             cleanable.clean();
         }
         nativeHandle = doInit0(getAlgorithm(), getCipherType(), getDigestType(), this.cachedIV, this.outputLength, keyBytes);
+        if (nativeHandle == 0) {
+            throw new ProviderException("Failed to reset MAC");
+        }
         macState = new MACState(nativeHandle);
         macState.setKeyBytes(keyBytes);
         cleanable = cleaner.register(this, macState);

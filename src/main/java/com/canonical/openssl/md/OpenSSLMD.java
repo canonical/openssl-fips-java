@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.nio.ByteBuffer;
 import java.security.DigestException;
 import java.security.MessageDigestSpi;
+import java.security.ProviderException;
 import java.util.Arrays;
 
 /* This implementation will be exercised by the user through the
@@ -65,6 +66,9 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
     private void ensureInitialized() {
         if (!initialized) {
             nativeHandle = doInit0(mdName);
+            if (nativeHandle == 0) {
+                throw new ProviderException("Failed to initialize message digest " + mdName);
+            }
             cleanable = cleaner.register(this, new MDState(nativeHandle));
             initialized = true;
         }
@@ -94,6 +98,9 @@ public abstract class OpenSSLMD extends MessageDigestSpi {
             cleanable.clean();
         }
         nativeHandle = doInit0(mdName);
+        if (nativeHandle == 0) {
+            throw new ProviderException("Failed to initialize message digest " + mdName);
+        }
         cleanable = cleaner.register(this, new MDState(nativeHandle));
         initialized = true;
     }

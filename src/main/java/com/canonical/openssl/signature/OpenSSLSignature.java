@@ -137,6 +137,9 @@ public abstract class OpenSSLSignature extends SignatureSpi {
                cleanable.clean();
            }
            nativeHandle = engineInitSign0(getSignatureName(), privKey, params);
+           if (nativeHandle == 0) {
+               throw new InvalidKeyException("Failed to initialize signature for signing");
+           }
            cleanable = cleaner.register(this, new SignatureState(nativeHandle));
        } else {
            throw new InvalidKeyException ("Supplied PrivateKey is of type: " + key.getClass());
@@ -159,6 +162,9 @@ public abstract class OpenSSLSignature extends SignatureSpi {
                 cleanable.clean();
             }
             nativeHandle = engineInitVerify0(getSignatureName(), pubKey, params);
+            if (nativeHandle == 0) {
+                throw new InvalidKeyException("Failed to initialize signature for verification");
+            }
             cleanable = cleaner.register(this, new SignatureState(nativeHandle));
         } else {
             throw new InvalidKeyException ("Supplied PublicKey is not OpenSSL-based");

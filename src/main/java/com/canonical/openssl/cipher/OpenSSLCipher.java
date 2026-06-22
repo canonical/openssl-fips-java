@@ -30,6 +30,7 @@ import java.security.spec.AlgorithmParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.GCMParameterSpec;
 import java.security.InvalidAlgorithmParameterException;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import javax.crypto.ShortBufferException;
 import javax.crypto.IllegalBlockSizeException;
@@ -73,6 +74,10 @@ abstract public class OpenSSLCipher extends CipherSpi {
     int opmode = UNDECIDED;
     boolean firstUpdate = true;
     private ClearableBuffer aeadDecryptBuffer;
+
+    // Last (key, IV) latched for AEAD encryption on this instance, used to reject GCM/CCM nonce reuse.
+    private byte[] lastEncKey;
+    private byte[] lastEncIv;
 
     private static final class ClearableBuffer {
         private byte[] buf = new byte[256];
@@ -151,6 +156,9 @@ abstract public class OpenSSLCipher extends CipherSpi {
         this.mode = parts[2];
         this.padding = padding;
         this.cipherContext = createContext0(nameKeySizeAndMode, padding);
+        if (this.cipherContext == 0) {
+            throw new ProviderException("Failed to create cipher context for " + nameKeySizeAndMode);
+        }
         this.cipherState = new CipherState(this.cipherContext);
         cleanable = cleaner.register(this, cipherState);
     }
@@ -271,10 +279,30 @@ abstract public class OpenSSLCipher extends CipherSpi {
         if (newKeyBytes == null) {
             throw new InvalidKeyException("Key does not support encoding");
         }
+        boolean encrypting = (opmode == Cipher.ENCRYPT_MODE || opmode == Cipher.WRAP_MODE);
+        boolean isAEAD = isModeGCM() || isModeCCM();
+        // Reject reuse of the same key+IV for AEAD encryption: GCM/CCM nonce reuse is catastrophic.
+        if (encrypting && isAEAD && lastEncIv != null && lastEncKey != null
+                && MessageDigest.isEqual(specIv, lastEncIv)
+                && MessageDigest.isEqual(newKeyBytes, lastEncKey)) {
+            Arrays.fill(newKeyBytes, (byte) 0);
+            throw new InvalidAlgorithmParameterException(
+                "Cannot reuse the same key and IV for " + mode + " encryption (nonce reuse)");
+        }
         resetStateForInit(opmode);
         this.keyBytes = newKeyBytes;
         this.iv = specIv;
         cipherState.setIV(this.iv);
+        if (encrypting && isAEAD) {
+            if (lastEncKey != null) {
+                Arrays.fill(lastEncKey, (byte) 0);
+            }
+            if (lastEncIv != null) {
+                Arrays.fill(lastEncIv, (byte) 0);
+            }
+            lastEncKey = newKeyBytes.clone();
+            lastEncIv = specIv.clone();
+        }
         if (!isModeCCM()) {
             doInit0(null, 0, 0, keyBytes, iv, this.opmode);
             Arrays.fill(keyBytes, (byte)0);

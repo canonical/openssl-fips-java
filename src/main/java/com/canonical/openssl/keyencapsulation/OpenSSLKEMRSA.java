@@ -97,15 +97,18 @@ final public class OpenSSLKEMRSA implements KEMSpi {
                 throw new InvalidKeyException("Key does not support encoding");
             }
             nativeHandle = encapsulatorInit0(encoded);
-            cleanable = cleaner.register(this, new EncapsulatorState(nativeHandle));
             if (nativeHandle == 0) {
                 throw new InvalidKeyException("Failed to initialize RSA-KEM encapsulator");
             }
+            cleanable = cleaner.register(this, new EncapsulatorState(nativeHandle));
         }
 
         public KEM.Encapsulated engineEncapsulate(int from, int to, String algorithm) {
-            // TODO: ignoring from, to in the prototype
             int secretSize = engineSecretSize();
+            if (from < 0 || from > to || to > secretSize) {
+                throw new IndexOutOfBoundsException(
+                    "Invalid range [" + from + ", " + to + ") for secret of size " + secretSize);
+            }
             byte[] secretBytes = new byte[secretSize];
 
             int encapsulationSize = engineEncapsulationSize();
@@ -113,7 +116,8 @@ final public class OpenSSLKEMRSA implements KEMSpi {
 
             engineEncapsulate0(secretBytes, encapsulatedBytes);
             try {
-                SecretKey secretKey = new SecretKeySpec(secretBytes, algorithm);
+                SecretKey secretKey =
+                    new SecretKeySpec(secretBytes, from, to - from, algorithm);
                 return new KEM.Encapsulated(secretKey, encapsulatedBytes, null);
             } finally {
                 Arrays.fill(secretBytes, (byte)0);
@@ -169,17 +173,24 @@ final public class OpenSSLKEMRSA implements KEMSpi {
             } finally {
                 Arrays.fill(encoded, (byte) 0);
             }
-            cleanable = cleaner.register(this, new DecapsulatorState(nativeHandle));
             if (nativeHandle == 0) {
                 throw new InvalidKeyException("Failed to initialize RSA-KEM decapsulator");
             }
+            cleanable = cleaner.register(this, new DecapsulatorState(nativeHandle));
         }
 
         public SecretKey engineDecapsulate(byte[] encapsulation, int from, int to, String algorithm)
                 throws DecapsulateException {
+            // The secret size is only known once the encapsulation has been
+            // unwrapped, so decapsulate first and then validate the range.
             byte[] secretBytes = engineDecapsulate0(encapsulation);
             try {
-                return new SecretKeySpec(secretBytes, algorithm);
+                if (from < 0 || from > to || to > secretBytes.length) {
+                    throw new IndexOutOfBoundsException(
+                        "Invalid range [" + from + ", " + to + ") for secret of size "
+                            + secretBytes.length);
+                }
+                return new SecretKeySpec(secretBytes, from, to - from, algorithm);
             } finally {
                 Arrays.fill(secretBytes, (byte)0);
             }

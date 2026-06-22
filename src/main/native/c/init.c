@@ -100,6 +100,26 @@ static void unload_global_libctx() {
     unload_libctx(ctx);
 }
 
+/*
+ * Note on OPENSSL_CUSTOM_CONF and the config file:
+ *
+ * When the FIPS provider is not already available by default (i.e. outside the
+ * Ubuntu Pro auto-FIPS setup), we load OpenSSL's configuration from the file
+ * named by the OPENSSL_CUSTOM_CONF environment variable, or from
+ * /usr/local/ssl/openssl.cnf if that variable is not set. That config decides
+ * which provider gets loaded as "fips".
+ *
+ * Both the environment variable and the config file it points to are TRUSTED
+ * inputs. Anyone who can change either of them can choose which OpenSSL provider
+ * module is loaded into this process. We use secure_getenv, so the variable is
+ * ignored when the process is running with elevated privileges (setuid/setgid),
+ * but in every other case the caller is responsible for protecting these inputs.
+ *
+ * In deployments where FIPS compliance is required, make sure the config file
+ * (and the directory containing it) is owned by root and not writable by
+ * untrusted users, so that "fips" cannot be redirected to a non-validated
+ * module.
+ */
 int JNI_OnLoad(JavaVM* vm, void *reserved) {
     const char *default_cnf = "/usr/local/ssl/openssl.cnf";
     const char *custom_cnf = secure_getenv("OPENSSL_CUSTOM_CONF");

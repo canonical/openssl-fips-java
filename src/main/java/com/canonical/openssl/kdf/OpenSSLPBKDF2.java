@@ -17,6 +17,9 @@
 package com.canonical.openssl.kdf;
 
 import com.canonical.openssl.util.NativeLibraryLoader;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.spec.KeySpec;
 import java.util.Arrays;
 import javax.crypto.SecretKey;
@@ -142,10 +145,18 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
                     + " (FIPS SP 800-132)");
             }
             int keyLengthBytes = resolveKeyLengthBytes(pbeKeySpec.getKeyLength());
-            PBKDF2SecretKey secretKey = new PBKDF2SecretKey(pbeKeySpec.getPassword(),
+            char[] password = pbeKeySpec.getPassword();
+            PBKDF2SecretKey secretKey = new PBKDF2SecretKey(password,
                                     pbeKeySpec.getSalt(), pbeKeySpec.getIterationCount());
-            byte[] secretBytes = generateSecret0(pbeKeySpec.getPassword(), pbeKeySpec.getSalt(),
+            byte[] passwordBytes = encodePassword(password);
+            byte[] secretBytes;
+            try {
+                secretBytes = generateSecret0(passwordBytes, pbeKeySpec.getSalt(),
                                                 pbeKeySpec.getIterationCount(), keyLengthBytes);
+            } finally {
+                Arrays.fill(passwordBytes, (byte) 0);
+                Arrays.fill(password, '\0');
+            }
             if (secretBytes == null) {
                 throw new InvalidKeySpecException("PBKDF2 derivation failed");
             }
@@ -222,10 +233,18 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
                 "Key length " + (keyLengthBytes * 8) + " bits exceeds the maximum supported "
                 + (MAX_KEY_LENGTH_BYTES * 8) + " bits");
         }
-        PBKDF2SecretKey secretKey = new PBKDF2SecretKey(pbeKey.getPassword(), pbeKey.getSalt(),
+        char[] password = pbeKey.getPassword();
+        PBKDF2SecretKey secretKey = new PBKDF2SecretKey(password, pbeKey.getSalt(),
                                                         pbeKey.getIterationCount());
-        byte[] secretBytes = generateSecret0(pbeKey.getPassword(), pbeKey.getSalt(),
+        byte[] passwordBytes = encodePassword(password);
+        byte[] secretBytes;
+        try {
+            secretBytes = generateSecret0(passwordBytes, pbeKey.getSalt(),
                                              pbeKey.getIterationCount(), keyLengthBytes);
+        } finally {
+            Arrays.fill(passwordBytes, (byte) 0);
+            Arrays.fill(password, '\0');
+        }
         if (secretBytes == null) {
             throw new InvalidKeyException("PBKDF2 derivation failed");
         }
@@ -237,6 +256,17 @@ public class OpenSSLPBKDF2 extends SecretKeyFactorySpi {
         return secretKey;
     }
 
-    private native byte[] generateSecret0(char[] password, byte[] salt, int iterationCount, int keyLength);
+    // UTF-8 encode the password for portability
+    private static byte[] encodePassword(char[] password) {
+        ByteBuffer bb = StandardCharsets.UTF_8.encode(CharBuffer.wrap(password));
+        byte[] bytes = new byte[bb.remaining()];
+        bb.get(bytes);
+        if (bb.hasArray()) {
+            Arrays.fill(bb.array(), (byte) 0);
+        }
+        return bytes;
+    }
+
+    private native byte[] generateSecret0(byte[] password, byte[] salt, int iterationCount, int keyLength);
     private static native int getMaxKeyLengthBytes0();
 }
