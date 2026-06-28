@@ -31,9 +31,10 @@ public final class OpenSSLFIPSProvider extends Provider {
         put("KeyAgreement.DH", "com.canonical.openssl.keyagreement.DHKeyAgreement");
         put("KeyAgreement.ECDH", "com.canonical.openssl.keyagreement.ECDHKeyAgreement");
 
-        // Key Pair Generators (FIPS-approved named groups only)
+        // Key Pair Generators (FIPS-approved named groups only for EC/DH)
         put("KeyPairGenerator.DH", "com.canonical.openssl.keypairgenerator.DHKeyPairGenerator");
         put("KeyPairGenerator.EC", "com.canonical.openssl.keypairgenerator.ECKeyPairGenerator");
+        put("KeyPairGenerator.RSA", "com.canonical.openssl.keypairgenerator.RSAKeyPairGenerator");
 
         // Key Encapsulation
         put("KEM.RSA", "com.canonical.openssl.keyencapsulation.OpenSSLKEMRSA");

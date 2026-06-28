@@ -24,4 +24,15 @@
 /* FIPS-safe decoder-based functions using OSSL_DECODER */
 EVP_PKEY *decode_private_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libctx);
 EVP_PKEY *decode_public_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libctx);
+
+/*
+ * DER-encode part of an EVP_PKEY via OSSL_ENCODER. selection is an EVP_PKEY_*
+ * selection flag (e.g. EVP_PKEY_KEYPAIR, EVP_PKEY_PUBLIC_KEY) and structure the
+ * encoding structure name ("PrivateKeyInfo" / "SubjectPublicKeyInfo"). On
+ * success returns 1 and stores a freshly allocated buffer in *out (the caller
+ * frees it with OPENSSL_free, cleansing first for private material); returns 0
+ * on failure with *out left NULL.
+ */
+int encode_pkey_der(EVP_PKEY *pkey, int selection, const char *structure,
+                    unsigned char **out, size_t *out_len);
 #endif // _INCLUDE_EVP_UTILS_H

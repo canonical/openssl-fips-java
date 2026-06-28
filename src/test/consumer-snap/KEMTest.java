@@ -16,7 +16,7 @@ public class KEMTest {
         String cname = "com.canonical.openssl.provider.OpenSSLFIPSProvider";
         Security.addProvider((java.security.Provider) Class.forName(cname).newInstance());
 
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         kpg.initialize(4096);
 
         // Alice creates a key pair and shares the public key with Bob

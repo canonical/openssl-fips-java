@@ -30,8 +30,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
+import java.security.interfaces.RSAKey;
 import java.util.Arrays;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -56,19 +55,26 @@ final public class OpenSSLKEMRSA implements KEMSpi {
             AlgorithmParameterSpec spec, SecureRandom secureRandom)
                     throws InvalidAlgorithmParameterException, InvalidKeyException {
         // TODO: spec, secureRandom are ignored, we could use RSAKeyGenParameterSpec
-        if (publicKey instanceof RSAPublicKey rsaPublicKey)
-            return new RSAKEMEncapsulator(rsaPublicKey);
-        else
-            throw new InvalidKeyException("Public key is not an RSAPublicKey");
+        // The native side parses the X.509 encoding, so any RSA public key that
+        // exposes its encoding is accepted - including this provider's own opaque
+        // EncodedPublicKey, which is not an RSAPublicKey instance.
+        if (!isRSAKey(publicKey))
+            throw new InvalidKeyException("Public key is not an RSA key");
+        return new RSAKEMEncapsulator(publicKey);
     }
 
     public DecapsulatorSpi engineNewDecapsulator(PrivateKey privateKey, AlgorithmParameterSpec spec)
             throws InvalidAlgorithmParameterException, InvalidKeyException {
         // TODO: spec, secureRandom are ignored, we could use RSAKeyGenParameterSpec
-        if (privateKey instanceof RSAPrivateKey rsaPrivateKey)
-            return new RSAKEMDecapsulator(rsaPrivateKey);
-        else
-            throw new InvalidKeyException("Private key is not an RSAPrivateKey"); 
+        if (!isRSAKey(privateKey))
+            throw new InvalidKeyException("Private key is not an RSA key");
+        return new RSAKEMDecapsulator(privateKey);
+    }
+
+    // Accepts the standard RSAKey interfaces as well as opaque provider keys
+    // (e.g. EncodedPublicKey/EncodedPrivateKey) that only report their algorithm.
+    private static boolean isRSAKey(java.security.Key key) {
+        return key instanceof RSAKey || "RSA".equalsIgnoreCase(key.getAlgorithm());
     }
 
     final public class RSAKEMEncapsulator implements KEMSpi.EncapsulatorSpi {

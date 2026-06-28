@@ -16,27 +16,13 @@
  */
 #include <jni.h>
 #include <openssl/evp.h>
-#include <openssl/encoder.h>
 #include <openssl/core_names.h>
 #include <openssl/crypto.h>
 
 #include "jssl.h"
 #include "jni_utils.h"
+#include "evp_utils.h"
 #include "OpenSSLKeyPairGenerator.h"
-
-static int encode_pkey(EVP_PKEY *pkey, int selection, const char *structure,
-                       unsigned char **out, size_t *out_len) {
-    OSSL_ENCODER_CTX *ectx = OSSL_ENCODER_CTX_new_for_pkey(
-        pkey, selection, "DER", structure, NULL);
-    if (ectx == NULL) {
-        return 0;
-    }
-    *out = NULL;
-    *out_len = 0;
-    int ok = OSSL_ENCODER_to_data(ectx, out, out_len);
-    OSSL_ENCODER_CTX_free(ectx);
-    return ok;
-}
 
 JNIEXPORT jobjectArray JNICALL
 Java_com_canonical_openssl_keypairgenerator_OpenSSLKeyPairGenerator_generateKeyPair0
@@ -94,13 +80,13 @@ Java_com_canonical_openssl_keypairgenerator_OpenSSLKeyPairGenerator_generateKeyP
         goto cleanup;
     }
 
-    if (!encode_pkey(pkey, EVP_PKEY_KEYPAIR, "PrivateKeyInfo",
+    if (!encode_pkey_der(pkey, EVP_PKEY_KEYPAIR, "PrivateKeyInfo",
                      &priv_der, &priv_len)) {
         throwProviderException(env, "private key DER encoding failed");
         goto cleanup;
     }
 
-    if (!encode_pkey(pkey, EVP_PKEY_PUBLIC_KEY, "SubjectPublicKeyInfo",
+    if (!encode_pkey_der(pkey, EVP_PKEY_PUBLIC_KEY, "SubjectPublicKeyInfo",
                      &pub_der, &pub_len)) {
         throwProviderException(env, "public key DER encoding failed");
         goto cleanup;
