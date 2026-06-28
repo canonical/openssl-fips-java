@@ -36,9 +36,13 @@ EVP_PKEY *decode_private_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libc
     /* Create decoder context for private keys in DER format
      * This will automatically detect the key type (RSA, EC, Ed25519, Ed448, etc.)
      * and route through the appropriate provider (FIPS in our case)
+     *
+     * DOMAIN_PARAMETERS must be part of the selection for EC keys, the curve is
+     * carried as a domain parameter.
      */
     dctx = OSSL_DECODER_CTX_new_for_pkey(&pkey, "DER", NULL, NULL,
-                                         OSSL_KEYMGMT_SELECT_KEYPAIR,
+                                         OSSL_KEYMGMT_SELECT_KEYPAIR
+                                         | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
                                          libctx, NULL);
 
     if (dctx == NULL) {
@@ -64,9 +68,13 @@ EVP_PKEY *decode_public_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libct
         libctx = jssl_libctx();
     }
 
-    /* Create decoder context for public keys in DER format */
+    /* Create decoder context for public keys in DER format.
+     * DOMAIN_PARAMETERS must be included so EC public keys, the curve is a
+     * domain parameter.
+     */
     dctx = OSSL_DECODER_CTX_new_for_pkey(&pkey, "DER", NULL, NULL,
-                                         OSSL_KEYMGMT_SELECT_PUBLIC_KEY,
+                                         OSSL_KEYMGMT_SELECT_PUBLIC_KEY
+                                         | OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS,
                                          libctx, NULL);
 
     if (dctx == NULL) {
