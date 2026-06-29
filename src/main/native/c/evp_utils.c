@@ -16,8 +16,10 @@
  */
 #include <openssl/evp.h>
 #include <openssl/decoder.h>
+#include <openssl/encoder.h>
 
 #include "jssl.h"
+#include "evp_utils.h"
 
 /* FIPS-safe decoder functions using OSSL_DECODER API
  * These functions properly route through the FIPS provider and respect
@@ -88,5 +90,19 @@ EVP_PKEY *decode_public_key_fips(byte* bytes, size_t length, OSSL_LIB_CTX *libct
 
     OSSL_DECODER_CTX_free(dctx);
     return pkey;
+}
+
+int encode_pkey_der(EVP_PKEY *pkey, int selection, const char *structure,
+                    unsigned char **out, size_t *out_len) {
+    OSSL_ENCODER_CTX *ectx = OSSL_ENCODER_CTX_new_for_pkey(
+        pkey, selection, "DER", structure, NULL);
+    if (ectx == NULL) {
+        return 0;
+    }
+    *out = NULL;
+    *out_len = 0;
+    int ok = OSSL_ENCODER_to_data(ectx, out, out_len);
+    OSSL_ENCODER_CTX_free(ectx);
+    return ok;
 }
 

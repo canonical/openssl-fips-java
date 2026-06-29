@@ -37,7 +37,7 @@ public class KeyEncapsulationTest {
 
     @Test
     public void testKEMRSA() throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         kpg.initialize(4096);
 
         // Alice creates a key pair and shares the public key with Bob
@@ -64,7 +64,7 @@ public class KeyEncapsulationTest {
 
     @Test
     public void testKEMRSAPartialRange() throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         kpg.initialize(4096);
 
         KeyPair aliceKeys = kpg.generateKeyPair();

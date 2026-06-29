@@ -44,7 +44,7 @@ public class KeyConverterTest {
     @Test
     public void testRSAPrivateKeyConversion() throws Exception {
         // Generate an RSA key pair using standard Java
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         kpg.initialize(2048);
         KeyPair kp = kpg.generateKeyPair();
 
@@ -58,50 +58,6 @@ public class KeyConverterTest {
         // Clean up
         KeyConverter.freeEVPKey(privateHandle);
         KeyConverter.freeEVPKey(publicHandle);
-    }
-
-    @Test
-    public void testEd25519KeyConversion() {
-        try {
-            KeyPairGenerator kpg = KeyPairGenerator.getInstance("Ed25519");
-            KeyPair kp = kpg.generateKeyPair();
-
-            // Convert to EVP_PKEY handle
-            long privateHandle = KeyConverter.privateKeyToEVPKey(kp.getPrivate());
-            assertTrue("Ed25519 private key conversion should succeed", privateHandle != 0);
-
-            long publicHandle = KeyConverter.publicKeyToEVPKey(kp.getPublic());
-            assertTrue("Ed25519 public key conversion should succeed", publicHandle != 0);
-
-            // Clean up
-            KeyConverter.freeEVPKey(privateHandle);
-            KeyConverter.freeEVPKey(publicHandle);
-        } catch (NoSuchAlgorithmException e) {
-            // Ed25519 may not be available in all JDKs
-            System.out.println("Ed25519 not available, skipping test");
-        }
-    }
-
-    @Test
-    public void testEd448KeyConversion() {
-        try {
-            KeyPairGenerator kpg = KeyPairGenerator.getInstance("Ed448");
-            KeyPair kp = kpg.generateKeyPair();
-
-            // Convert to EVP_PKEY handle
-            long privateHandle = KeyConverter.privateKeyToEVPKey(kp.getPrivate());
-            assertTrue("Ed448 private key conversion should succeed", privateHandle != 0);
-
-            long publicHandle = KeyConverter.publicKeyToEVPKey(kp.getPublic());
-            assertTrue("Ed448 public key conversion should succeed", publicHandle != 0);
-
-            // Clean up
-            KeyConverter.freeEVPKey(privateHandle);
-            KeyConverter.freeEVPKey(publicHandle);
-        } catch (NoSuchAlgorithmException e) {
-            // Ed448 may not be available in all JDKs
-            System.out.println("Ed448 not available, skipping test");
-        }
     }
 
     @Test

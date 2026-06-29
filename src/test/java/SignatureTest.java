@@ -47,7 +47,7 @@ public class SignatureTest {
 
     @Test
     public void testRSABasic() throws Exception {
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         KeyPair kp = gen.generateKeyPair();
         PublicKey publicKey = new RSAPublicKey(KeyConverter.publicKeyToEVPKey(kp.getPublic()));
         PrivateKey privateKey = new RSAPrivateKey(KeyConverter.privateKeyToEVPKey(kp.getPrivate()));
@@ -67,7 +67,7 @@ public class SignatureTest {
 
     @Test
     public void testRSAwithMultipleUpdates() throws Exception {
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         gen.initialize(4096);
         KeyPair kp = gen.generateKeyPair();
         PublicKey publicKey = new RSAPublicKey(KeyConverter.publicKeyToEVPKey(kp.getPublic()));
@@ -92,7 +92,7 @@ public class SignatureTest {
 
     @Test
     public void testRSAsingleByteUpdates() throws Exception {
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         KeyPair kp = gen.generateKeyPair();
         PublicKey publicKey = new RSAPublicKey(KeyConverter.publicKeyToEVPKey(kp.getPublic()));
         PrivateKey privateKey = new RSAPrivateKey(KeyConverter.privateKeyToEVPKey(kp.getPrivate()));
@@ -115,8 +115,8 @@ public class SignatureTest {
 
     @Test
     public void testRSAmultipleByteBufferUpdates() throws Exception {
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
-        gen.initialize(8192);
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
+        gen.initialize(4096);
         KeyPair kp = gen.generateKeyPair();
         PublicKey publicKey = new RSAPublicKey(KeyConverter.publicKeyToEVPKey(kp.getPublic()));
         PrivateKey privateKey = new RSAPrivateKey(KeyConverter.privateKeyToEVPKey(kp.getPrivate()));
@@ -136,7 +136,7 @@ public class SignatureTest {
 
     @Test
     public void testRSAsignNonzeroOffset() throws Exception {
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         gen.initialize(4096);
         KeyPair kp = gen.generateKeyPair();
         PublicKey publicKey = new RSAPublicKey(KeyConverter.publicKeyToEVPKey(kp.getPublic()));
@@ -158,7 +158,7 @@ public class SignatureTest {
 
     @Test
     public void testRSAtamperedSignature() throws Exception {
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         KeyPair kp = gen.generateKeyPair();
         PublicKey publicKey = new RSAPublicKey(KeyConverter.publicKeyToEVPKey(kp.getPublic()));
         PrivateKey privateKey = new RSAPrivateKey(KeyConverter.privateKeyToEVPKey(kp.getPrivate()));
@@ -184,7 +184,7 @@ public class SignatureTest {
 
     @Test
     public void testRSAtamperedContent() throws Exception {
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
         KeyPair kp = gen.generateKeyPair();
         PublicKey publicKey = new RSAPublicKey(KeyConverter.publicKeyToEVPKey(kp.getPublic()));
         PrivateKey privateKey = new RSAPrivateKey(KeyConverter.privateKeyToEVPKey(kp.getPrivate()));

@@ -70,8 +70,8 @@ abstract public class OpenSSLKeyPairGenerator extends KeyPairGeneratorSpi {
     }
 
     @Override
-    public KeyPair generateKeyPair() {
-        byte[][] encoded = generateKeyPair0(getAlgorithmName(), group);
+    public final KeyPair generateKeyPair() {
+        byte[][] encoded = generateEncodedKeyPair();
         if (encoded == null || encoded.length != 2
                 || encoded[0] == null || encoded[1] == null) {
             throw new ProviderException(
@@ -83,10 +83,22 @@ abstract public class OpenSSLKeyPairGenerator extends KeyPairGeneratorSpi {
         return new KeyPair(pub, priv);
     }
 
+    /**
+     * Produces the freshly generated key pair as {@code {PKCS#8 private DER,
+     * X.509 public DER}}. The default uses OpenSSL's named-group generator and
+     * suits the EC/DH subclasses; algorithms that are not parameterised by a
+     * named group (e.g. RSA) override this.
+     */
+    protected byte[][] generateEncodedKeyPair() {
+        return generateKeyPair0(getAlgorithmName(), group);
+    }
+
     protected abstract String getAlgorithmName();
 
     /** Returns the named group for the given keysize, or null if unsupported. */
-    protected abstract String mapKeysizeToGroup(int keysize);
+    protected String mapKeysizeToGroup(int keysize) {
+        return null;
+    }
 
     /** Returns the named group for the given spec, or null if unsupported. */
     protected String groupFromSpec(AlgorithmParameterSpec params) {

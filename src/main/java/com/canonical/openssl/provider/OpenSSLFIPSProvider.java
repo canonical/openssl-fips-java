@@ -20,7 +20,7 @@ import java.security.Provider;
 
 public final class OpenSSLFIPSProvider extends Provider {
     public OpenSSLFIPSProvider() {
-        super("OpenSSLFIPSProvider", "0.0.1", "A pass-through security provider for FIPS-certified openssl");
+        super("OpenSSLFIPSProvider", "0.8.0", "A pass-through security provider for FIPS-certified openssl");
 
         // SecureRandom
         put("SecureRandom.AES256CTR", "com.canonical.openssl.drbg.DrbgAES256CTR");
@@ -31,9 +31,10 @@ public final class OpenSSLFIPSProvider extends Provider {
         put("KeyAgreement.DH", "com.canonical.openssl.keyagreement.DHKeyAgreement");
         put("KeyAgreement.ECDH", "com.canonical.openssl.keyagreement.ECDHKeyAgreement");
 
-        // Key Pair Generators (FIPS-approved named groups only)
+        // Key Pair Generators (FIPS-approved named groups only for EC/DH)
         put("KeyPairGenerator.DH", "com.canonical.openssl.keypairgenerator.DHKeyPairGenerator");
         put("KeyPairGenerator.EC", "com.canonical.openssl.keypairgenerator.ECKeyPairGenerator");
+        put("KeyPairGenerator.RSA", "com.canonical.openssl.keypairgenerator.RSAKeyPairGenerator");
 
         // Key Encapsulation
         put("KEM.RSA", "com.canonical.openssl.keyencapsulation.OpenSSLKEMRSA");
