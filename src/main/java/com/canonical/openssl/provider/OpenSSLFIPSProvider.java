@@ -20,7 +20,7 @@ import java.security.Provider;
 
 public final class OpenSSLFIPSProvider extends Provider {
     public OpenSSLFIPSProvider() {
-        super("OpenSSLFIPSProvider", "0.0.1", "A pass-through security provider for FIPS-certified openssl");
+        super("OpenSSLFIPSProvider", "0.7.2", "A pass-through security provider for FIPS-certified openssl");
 
         // SecureRandom
         put("SecureRandom.AES256CTR", "com.canonical.openssl.drbg.DrbgAES256CTR");
