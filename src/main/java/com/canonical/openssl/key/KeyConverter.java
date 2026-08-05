@@ -59,10 +59,14 @@ public class KeyConverter {
         if (encoded == null) {
             throw new IllegalArgumentException("Key does not support encoding");
         }
+        // Work on a private copy: getEncoded() is only required to return the
+        // encoding, not a fresh array, so zeroing it could destroy key material
+        // still owned by the caller's key object.
+        byte[] copy = encoded.clone();
         try {
-            return privateKeyToEVPKey0(encoded);
+            return privateKeyToEVPKey0(copy);
         } finally {
-            Arrays.fill(encoded, (byte) 0);
+            Arrays.fill(copy, (byte) 0);
         }
     }
     /**

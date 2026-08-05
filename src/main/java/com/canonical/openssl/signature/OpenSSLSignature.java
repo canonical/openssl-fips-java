@@ -112,6 +112,42 @@ public abstract class OpenSSLSignature extends SignatureSpi {
 
     protected abstract String getSignatureName();
 
+    /**
+     * The key algorithm this signature works with, as reported by
+     * {@link java.security.Key#getAlgorithm()}. Derived from the signature name
+     * by stripping the digest suffix ("RSAwithSHA256" -&gt; "RSA"), which covers
+     * every signature currently registered by this provider.
+     */
+    protected String getKeyAlgorithm() {
+        String name = getSignatureName();
+        int index = name.toLowerCase().indexOf("with");
+        return index > 0 ? name.substring(0, index) : name;
+    }
+
+    /*
+     * The native layer derives the signature scheme from the key's own type
+     * (EVP_DigestSignInit_ex uses the EVP_PKEY's keymgmt), so a key of the
+     * wrong family would silently produce a signature in a different scheme
+     * than the one this SPI advertises. Reject the mismatch up front.
+     */
+    private void checkKeyAlgorithm(java.security.Key key) throws InvalidKeyException {
+        String expected = getKeyAlgorithm();
+        String actual = key.getAlgorithm();
+        if (actual == null) {
+            throw new InvalidKeyException("Key does not report an algorithm; expected " + expected);
+        }
+        if (expected.equalsIgnoreCase(actual)) {
+            return;
+        }
+        // Ed25519/Ed448 keys are reported as "EdDSA" by some providers.
+        if (("ED25519".equalsIgnoreCase(expected) || "ED448".equalsIgnoreCase(expected))
+                && "EdDSA".equalsIgnoreCase(actual)) {
+            return;
+        }
+        throw new InvalidKeyException("Key algorithm " + actual + " does not match "
+                + getSignatureName() + ", which requires a " + expected + " key");
+    }
+
     @Override
     protected Object engineGetParameter(String param) {
         throw new InvalidParameterException("Legacy getParameter(String) is not supported; use getParameters()");
@@ -132,17 +168,46 @@ public abstract class OpenSSLSignature extends SignatureSpi {
        if (key == null) {
            throw new InvalidKeyException("Key must not be null");
        }
-       if (key instanceof OpenSSLPrivateKey privKey) {
+       OpenSSLPrivateKey privKey;
+       boolean converted = false;
+       if (key instanceof OpenSSLPrivateKey opensslKey) {
+           // Handle is owned by the caller's key object; must not be freed here.
+           privKey = opensslKey;
+       } else {
+           // Accept any key with a PKCS#8 encoding - including this provider's
+           // own EncodedPrivateKey - by converting it to a native handle
+           // through the FIPS-safe OSSL_DECODER path.
+           checkKeyAlgorithm(key);
+           long handle = convertPrivateKey(key);
+           // Set before publishing the handle so the finally block always frees
+           // a handle this method allocated.
+           converted = true;
+           privKey = new ConvertedPrivateKey(key.getAlgorithm(), handle);
+       }
+       try {
+           // Drop any previous context first, and clear the field so a failed
+           // initialization cannot leave a freed handle behind for update()/sign().
            if (cleanable != null) {
                cleanable.clean();
+               cleanable = null;
            }
-           nativeHandle = engineInitSign0(getSignatureName(), privKey, params);
+           nativeHandle = 0L;
+           try {
+               nativeHandle = engineInitSign0(getSignatureName(), privKey, params);
+           } catch (ProviderException e) {
+               throw new InvalidKeyException("Failed to initialize signature for signing", e);
+           }
            if (nativeHandle == 0) {
                throw new InvalidKeyException("Failed to initialize signature for signing");
            }
            cleanable = cleaner.register(this, new SignatureState(nativeHandle));
-       } else {
-           throw new InvalidKeyException ("Supplied PrivateKey is of type: " + key.getClass());
+       } finally {
+           // The native signature context acquires its own reference to the
+           // key (EVP_PKEY_CTX_new_from_pkey), so a converted handle can be
+           // released as soon as initialisation completes.
+           if (converted) {
+               KeyConverter.freeEVPKey(privKey.getNativeKeyHandle());
+           }
        }
     }
 
@@ -157,17 +222,143 @@ public abstract class OpenSSLSignature extends SignatureSpi {
         if (key == null) {
             throw new InvalidKeyException("Key must not be null");
         }
-        if (key instanceof OpenSSLPublicKey pubKey) {
+        OpenSSLPublicKey pubKey;
+        boolean converted = false;
+        if (key instanceof OpenSSLPublicKey opensslKey) {
+            // Handle is owned by the caller's key object; must not be freed here.
+            pubKey = opensslKey;
+        } else {
+            // Accept any key with an X.509 encoding - including this provider's
+            // own EncodedPublicKey - by converting it to a native handle
+            // through the FIPS-safe OSSL_DECODER path.
+            checkKeyAlgorithm(key);
+            long handle = convertPublicKey(key);
+            converted = true;
+            pubKey = new ConvertedPublicKey(key.getAlgorithm(), handle);
+        }
+        try {
+            // See engineInitSign: clear prior state before re-initializing.
             if (cleanable != null) {
                 cleanable.clean();
+                cleanable = null;
             }
-            nativeHandle = engineInitVerify0(getSignatureName(), pubKey, params);
+            nativeHandle = 0L;
+            try {
+                nativeHandle = engineInitVerify0(getSignatureName(), pubKey, params);
+            } catch (ProviderException e) {
+                throw new InvalidKeyException("Failed to initialize signature for verification", e);
+            }
             if (nativeHandle == 0) {
                 throw new InvalidKeyException("Failed to initialize signature for verification");
             }
             cleanable = cleaner.register(this, new SignatureState(nativeHandle));
-        } else {
-            throw new InvalidKeyException ("Supplied PublicKey is not OpenSSL-based");
+        } finally {
+            // See engineInitSign: converted handles can be released once
+            // initialisation completes.
+            if (converted) {
+                KeyConverter.freeEVPKey(pubKey.getNativeKeyHandle());
+            }
+        }
+    }
+
+    private static long convertPrivateKey(PrivateKey key) throws InvalidKeyException {
+        final long handle;
+        try {
+            handle = KeyConverter.privateKeyToEVPKey(key);
+        } catch (RuntimeException e) {
+            // Includes IllegalArgumentException for unencodable keys and
+            // IllegalStateException from keys that have been destroyed.
+            throw new InvalidKeyException(
+                    "Unsupported private key type: " + key.getClass().getName(), e);
+        }
+        if (handle == 0) {
+            throw new InvalidKeyException(
+                    "Failed to convert private key of type: " + key.getClass().getName());
+        }
+        return handle;
+    }
+
+    private static long convertPublicKey(PublicKey key) throws InvalidKeyException {
+        final long handle;
+        try {
+            handle = KeyConverter.publicKeyToEVPKey(key);
+        } catch (RuntimeException e) {
+            throw new InvalidKeyException(
+                    "Unsupported public key type: " + key.getClass().getName(), e);
+        }
+        if (handle == 0) {
+            throw new InvalidKeyException(
+                    "Failed to convert public key of type: " + key.getClass().getName());
+        }
+        return handle;
+    }
+
+    /**
+     * A {@link PrivateKey} backed solely by a native {@code EVP_PKEY} handle,
+     * used to adapt converted keys for the native signature engine. The adapter
+     * itself exposes no encoding; the handle it wraps is owned by the
+     * {@code engineInit*} method that created it and is freed there.
+     */
+    private static final class ConvertedPrivateKey implements OpenSSLPrivateKey {
+        private final String algorithm;
+        private final long nativeHandle;
+
+        ConvertedPrivateKey(String algorithm, long nativeHandle) {
+            this.algorithm = algorithm;
+            this.nativeHandle = nativeHandle;
+        }
+
+        @Override
+        public long getNativeKeyHandle() {
+            return nativeHandle;
+        }
+
+        @Override
+        public String getAlgorithm() {
+            return algorithm;
+        }
+
+        @Override
+        public String getFormat() {
+            return null;
+        }
+
+        @Override
+        public byte[] getEncoded() {
+            return null;
+        }
+    }
+
+    /**
+     * Public-key counterpart of {@link ConvertedPrivateKey}.
+     */
+    private static final class ConvertedPublicKey implements OpenSSLPublicKey {
+        private final String algorithm;
+        private final long nativeHandle;
+
+        ConvertedPublicKey(String algorithm, long nativeHandle) {
+            this.algorithm = algorithm;
+            this.nativeHandle = nativeHandle;
+        }
+
+        @Override
+        public long getNativeKeyHandle() {
+            return nativeHandle;
+        }
+
+        @Override
+        public String getAlgorithm() {
+            return algorithm;
+        }
+
+        @Override
+        public String getFormat() {
+            return null;
+        }
+
+        @Override
+        public byte[] getEncoded() {
+            return null;
         }
     }
 
