@@ -21,6 +21,7 @@ import com.canonical.openssl.key.KeyConverter;
 import java.security.PublicKey;
 import java.security.PrivateKey;
 import java.nio.ByteBuffer;
+import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Security;
@@ -31,6 +32,7 @@ import org.junit.Test;
 import org.junit.BeforeClass;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 
 public class SignatureTest {
 
@@ -63,6 +65,143 @@ public class SignatureTest {
         verifier.update(bytes, 0, bytes.length);
 
         assertTrue("SignatureTest for RSA failed.", verifier.verify(sigBytes));
+    }
+
+    @Test
+    public void testRSAwithEncodedKeys() throws Exception {
+        // Keys taken straight from the KeyPairGenerator are opaque encoded
+        // keys; the Signature engine must accept them without an explicit
+        // KeyConverter step.
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
+        gen.initialize(2048);
+        KeyPair kp = gen.generateKeyPair();
+
+        Signature signer = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        signer.initSign(kp.getPrivate());
+        byte[] bytes = message.getBytes();
+        signer.update(bytes, 0, bytes.length);
+        byte[] sigBytes = signer.sign();
+
+        Signature verifier = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        verifier.initVerify(kp.getPublic());
+        verifier.update(bytes, 0, bytes.length);
+
+        assertTrue("SignatureTest with encoded keys failed.", verifier.verify(sigBytes));
+    }
+
+    @Test
+    public void testRSAwithMixedKeys() throws Exception {
+        // Both key representations must interoperate: sign with a
+        // native-handle key and verify with the encoded key, and vice versa.
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
+        KeyPair kp = gen.generateKeyPair();
+        PrivateKey nativePrivateKey = new RSAPrivateKey(KeyConverter.privateKeyToEVPKey(kp.getPrivate()));
+        PublicKey nativePublicKey = new RSAPublicKey(KeyConverter.publicKeyToEVPKey(kp.getPublic()));
+        byte[] bytes = message.getBytes();
+
+        Signature signer = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        signer.initSign(nativePrivateKey);
+        signer.update(bytes, 0, bytes.length);
+        byte[] sigBytes = signer.sign();
+
+        Signature verifier = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        verifier.initVerify(kp.getPublic());
+        verifier.update(bytes, 0, bytes.length);
+        assertTrue("native-sign/encoded-verify failed.", verifier.verify(sigBytes));
+
+        signer = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        signer.initSign(kp.getPrivate());
+        signer.update(bytes, 0, bytes.length);
+        sigBytes = signer.sign();
+
+        verifier = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        verifier.initVerify(nativePublicKey);
+        verifier.update(bytes, 0, bytes.length);
+        assertTrue("encoded-sign/native-verify failed.", verifier.verify(sigBytes));
+    }
+
+    @Test
+    public void testUnencodablePrivateKeyRejected() throws Exception {
+        // A key that is neither OpenSSL-based nor encodable must be rejected
+        // with InvalidKeyException rather than a runtime exception.
+        Signature signer = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        try {
+            signer.initSign(new UnencodablePrivateKey());
+            fail("Expected InvalidKeyException for an unencodable private key");
+        } catch (InvalidKeyException expected) {
+        }
+    }
+
+    @Test
+    public void testUnencodablePublicKeyRejected() throws Exception {
+        Signature verifier = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        try {
+            verifier.initVerify(new UnencodablePublicKey());
+            fail("Expected InvalidKeyException for an unencodable public key");
+        } catch (InvalidKeyException expected) {
+        }
+    }
+
+    @Test
+    public void testWrongKeyAlgorithmRejected() throws Exception {
+        // An EC key must not be accepted by an RSA signature: the native layer
+        // derives the scheme from the key, so this would otherwise produce an
+        // ECDSA signature from an object advertising RSAwithSHA256.
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("EC", "OpenSSLFIPSProvider");
+        KeyPair kp = gen.generateKeyPair();
+
+        Signature signer = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        try {
+            signer.initSign(kp.getPrivate());
+            fail("Expected InvalidKeyException for an EC private key on RSAwithSHA256");
+        } catch (InvalidKeyException expected) {
+        }
+
+        Signature verifier = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        try {
+            verifier.initVerify(kp.getPublic());
+            fail("Expected InvalidKeyException for an EC public key on RSAwithSHA256");
+        } catch (InvalidKeyException expected) {
+        }
+    }
+
+    @Test
+    public void testFailedReinitDoesNotBreakPriorState() throws Exception {
+        // A rejected re-initialization must not leave a freed native context
+        // behind: the previously initialized state stays usable.
+        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA", "OpenSSLFIPSProvider");
+        KeyPair kp = gen.generateKeyPair();
+        byte[] bytes = message.getBytes();
+
+        Signature signer = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        signer.initSign(kp.getPrivate());
+
+        KeyPairGenerator ecGen = KeyPairGenerator.getInstance("EC", "OpenSSLFIPSProvider");
+        try {
+            signer.initSign(ecGen.generateKeyPair().getPrivate());
+            fail("Expected InvalidKeyException on re-init with an EC key");
+        } catch (InvalidKeyException expected) {
+        }
+
+        signer.update(bytes, 0, bytes.length);
+        byte[] sigBytes = signer.sign();
+
+        Signature verifier = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        verifier.initVerify(kp.getPublic());
+        verifier.update(bytes, 0, bytes.length);
+        assertTrue("Signature after a failed re-init failed to verify.", verifier.verify(sigBytes));
+    }
+
+    @Test
+    public void testThrowingPrivateKeyRejected() throws Exception {
+        // A key whose getEncoded() throws (e.g. a destroyed key) must surface as
+        // InvalidKeyException, not as an unchecked exception.
+        Signature signer = Signature.getInstance("RSAwithSHA256", "OpenSSLFIPSProvider");
+        try {
+            signer.initSign(new ThrowingPrivateKey());
+            fail("Expected InvalidKeyException for a key whose getEncoded() throws");
+        } catch (InvalidKeyException expected) {
+        }
     }
 
     @Test
@@ -249,5 +388,33 @@ class RSAPrivateKey extends TestKey implements OpenSSLPrivateKey {
 
     public long getNativeKeyHandle() {
         return nativeKey;
+    }
+}
+
+class UnencodablePrivateKey extends TestKey implements PrivateKey {
+    // Reports RSA so it reaches the conversion path; getEncoded() returns null,
+    // so the key cannot be converted.
+    @Override
+    public String getAlgorithm() {
+        return "RSA";
+    }
+}
+
+class UnencodablePublicKey extends TestKey implements PublicKey {
+    @Override
+    public String getAlgorithm() {
+        return "RSA";
+    }
+}
+
+class ThrowingPrivateKey extends TestKey implements PrivateKey {
+    @Override
+    public String getAlgorithm() {
+        return "RSA";
+    }
+
+    @Override
+    public byte[] getEncoded() {
+        throw new IllegalStateException("key has been destroyed");
     }
 }
